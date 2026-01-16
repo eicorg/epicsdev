@@ -1,6 +1,6 @@
 """Skeleton and helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
-__version__= 'v1.0.0 26-01-16'# re-factored and simplified, comments added. Main() re-writtedn.
+__version__= 'v1.0.1 26-01-16'# recordLength and noiseLevel setters are fixed, randomized noise patterns
 #TODO: NTEnums do not have structure display
 
 import sys
@@ -257,23 +257,26 @@ if __name__ == "__main__":
 ['ch1Peak2Peak','Peak-to-peak amplitude',   SPV(0.,'A'), {}],
 ['alarm',       'PV with alarm',            SPV(0,'WA'), alarm],
         ]
-    nPatterns = 100 # number of patterns in the waveform.
+    nPatterns = 100 # number of waveform patterns.
     pargs = None
     nDivs = 10 # number of divisions on the oscilloscope screen. That is needed to set tAxis when recordLength is changed.                          
+    rng = np.random.default_rng()
 
     def set_recordLength(value):
         """Record length have changed. The tAxis should be updated accordingly."""
         printi(f'Setting tAxis to {value}')
         publish('tAxis', np.arange(value)*pvv('timePerDiv')/nDivs)
         publish('recordLength', value)
+        set_noise(pvv('noiseLevel')) # Re-initialize noise array, because its size depends on recordLength
 
     def set_noise(level):
         """Noise level have changed. Update noise array."""
-        printi(f'Setting noise level to {level}')
-        pargs.noise = np.random.normal(scale=0.5*level, size=pargs.npoints+nPatterns)
-        #printv(f'Noise array updated with level {level}: {pargs.noise}')
+        printi(f'Setting noise level to {repr(level)}')
+        recordLength = pvv('recordLength')
+        pargs.noise = np.random.normal(scale=0.5*level, size=recordLength+nPatterns)
+        print(f'Noise array {len(pargs.noise)} updated with level {repr(level)}')
         publish('noiseLevel', level)
-    
+
     def init(recordLength):
         """Testing function. Do not use in production code."""
         set_recordLength(recordLength)
@@ -281,7 +284,8 @@ if __name__ == "__main__":
 
     def poll():
         """Example of polling function"""
-        pattern = C_.cycle % nPatterns
+        #pattern = C_.cycle % nPatterns# produces sliding
+        pattern = rng.integers(0, nPatterns)
         C_.cycle += 1
         printv(f'cycle {C_.cycle}')
         publish('cycle', C_.cycle)
