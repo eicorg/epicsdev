@@ -1,123 +1,127 @@
 """Skeleton and helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
-__version__= 'v0.0.0 26-01-14'# Created
-#TODO: Do not start if another device is already running
+__version__= 'v1.0.0 26-01-16'# re-factored and simplified, comments added. Main() re-writtedn.
 #TODO: NTEnums do not have structure display
-#TODO: Find a way to indicate that a PV is writable.
-# Options:
-# 1) add structure control with (0,0) limits as indication of Writable.
-# 2) use an extra field of the NTScalar.
 
-import argparse
+import sys
 import time
 from p4p.nt import NTScalar, NTEnum
 from p4p.nt.enum import ntenum
 from p4p.server import Server
 from p4p.server.thread import SharedPV
+from p4p.client.thread import Context
 
 #``````````````````Module Storage`````````````````````````````````````````````
 class C_():
     """Storage for module members"""
-    AppName = 'epicsDevLecroyScope'
+    prefix = ''
+    verbose = 0
     cycle = 0
-    lastRareUpdate = 0.
-    server = None
     serverState = ''
     PVs = {}
     PVDefs = []
 #```````````````````Helper methods````````````````````````````````````````````
-def printTime(): return time.strftime("%m%d:%H%M%S")
-def printi(msg): print(f'inf_@{printTime()}: {msg}')
+def serverState():
+    """Return current server state. That is the value of the server PV, but cached in C_ to avoid unnecessary get() calls."""
+    return C_.serverState
+def _printTime():
+    return time.strftime("%m%d:%H%M%S")
+def printi(msg):
+    """Print info message and publish it to status PV."""
+    print(f'inf_@{_printTime()}: {msg}')
 def printw(msg):
-    txt = f'WAR_@{printTime()}: {msg}'
+    """Print warning message and publish it to status PV."""
+    txt = f'WAR_@{_printTime()}: {msg}'
     print(txt)
-    #publish('status',txt)
+    publish('status',txt)
 def printe(msg):
-    txt = f'ERR_{printTime()}: {msg}'
+    """Print error message and publish it to status PV."""
+    txt = f'ERR_{_printTime()}: {msg}'
     print(txt)
-    #publish('status',txt)
+    publish('status',txt)
 def _printv(msg, level):
-    if pargs.verbose >= level: print(f'DBG{level}: {msg}')
-def printv(msg): _printv(msg, 1)
-def printvv(msg): _printv(msg, 2)
-def printv3(msg): _printv(msg, 3)
+    if C_.verbose >= level: 
+        print(f'DBG{level}: {msg}')
+def printv(msg):
+    """Print debug message if verbosity level >=1."""
+    _printv(msg, 1)
+def printvv(msg):
+    """Print debug message if verbosity level >=2."""
+    _printv(msg, 2)
+def printv3(msg):
+    """Print debug message if verbosity level >=3."""
+    _printv(msg, 3)
 
-def pvobj(pvname):
+def pvobj(pvName):
     """Return PV with given name"""
-    return C_.PVs[pargs.prefix+pvname]
+    return C_.PVs[C_.prefix+pvName]
 
-def pvv(pvname:str):
+def pvv(pvName:str):
     """Return PV value"""
-    return pvobj(pvname).current()
+    return pvobj(pvName).current()
 
-def publish(pvname:str, value, ifChanged=False, t=None):
-    """Post PV with new value"""
+def publish(pvName:str, value, ifChanged=False, t=None):
+    """Publish value to PV. If ifChanged is True, then publish only if the value is different from the current value. If t is not None, then use it as timestamp, otherwise use current time."""
     try:
-        pv = pvobj(pvname)
+        pv = pvobj(pvName)
     except KeyError:
+        printw(f'PV {pvName} not found. Cannot publish value.')
         return
     if t is None:
         t = time.time()
     if not ifChanged or pv.current() != value:
         pv.post(value, timestamp=t)
 
-def SPV(initial, vtype=None):
-    """Construct SharedPV, vtype should be one of typeCode keys,
-    if vtype is None then the nominal type will be determined automatically
+def SPV(initial, meta='', vtype=None):
+    """Construct SharedPV.
+    meta is a string with characters W,A,E indicating if the PV is writable, has alarm or it is NTEnum.
+    vtype should be one of the p4p.nt type definitions (see https://epics-base.github.io/p4p/values.html).
+    if vtype is None then the nominal type will be determined automatically.
     """
     typeCode = {
-    'F64':'d',  'F32':'f',  'I64':'l',  'I8':'b',   'U8':'B',   'I16':'h',
-    'U16':'H',  'I32':'i',  'U32':'I', str:'s', 'enum':'enum',
+    's8':'b', 'u8':'B', 's16':'h', 'u16':'H', 'i32':'i', 'u32':'I', 'i64':'l',
+    'u64':'L', 'f32':'f', 'f64':'d', str:'s',
     }
     iterable  = type(initial) not in (int,float,str)
     if vtype is None:
         firstItem = initial[0] if iterable else initial
         itype = type(firstItem)
-        vtype = {int: 'I32', float: 'F32'}.get(itype,itype)
+        vtype = {int: 'i32', float: 'f32'}.get(itype,itype)
     tcode = typeCode[vtype]
-    if tcode == 'enum':
+    if 'E' in meta:
         initial = {'choices': initial, 'index': 0}
-        nt = NTEnum(display=True)#TODO: that does not work
+        nt = NTEnum(display=True, control='W' in meta)
     else:
         prefix = 'a' if iterable else ''
-        nt = NTScalar(prefix+tcode, display=True, control=True, valueAlarm=True)
-    return SharedPV(nt=nt, initial=initial)
-
-#``````````````````Definition of PVs``````````````````````````````````````````
-def _define_PVs():
-    """Example of PV definitions"""
-    R,W,SET,U,ENUM,LL,LH = 'R','W','setter','units','enum','limitLow','limitHigh'
-    alarm = {'valueAlarm':{'lowAlarmLimit':0, 'highAlarmLimit':100}}
-    return [
-# device-specific PVs
-['VoltOffset',  'Offset',  SPV(0.), W, {U:'V'}],
-['VoltPerDiv',  'Vertical scale',   SPV(0.), W, {U:'V/du'}],
-['TimePerDiv',  'Horizontal scale', SPV('0.01 0.02 0.05 0.1 0.2 0.5 1 2 5'.split(),ENUM), W, {U:'S/du'}],
-['trigDelay',   'Trigger delay',    SPV(0.), W, {U:'S'}],
-['Waveform',    'Waveform array',   SPV([0.]), R, {}],
-['tAxis',       'Full scale of horizontal axis', SPV([0.]), R,  {}],
-['recordLength','Max number of points',     SPV(100,'U32'), W, {}],
-['peak2peak',   'Peak-to-peak amplitude',   SPV(0.), R,     {}],
-['alarm',       'PV with alarm',    SPV(0), 'WA', alarm],
-    ]
+        nt = NTScalar(prefix+tcode, display=True, control='W' in meta, valueAlarm='A' in meta)
+    pv = SharedPV(nt=nt, initial=initial)
+    pv.writable = 'W' in meta
+    return pv
 
 #``````````````````create_PVs()```````````````````````````````````````````````
-def _create_PVs():
-    """Create PVs"""
+def _create_PVs(pvDefs):
+    """Create PVs, using definitions from pvDEfs list. Each definition is a list of the form:
+[pvname, description, SPV object, extra], where extra is a dictionary of extra parameters, like setter, units, limits etc. Setter is a function, that will be called when"""
     ts = time.time()
-    for defs in C_.PVDefs:
-        pname,desc,spv,features,extra = defs
-        pv = spv
-        ivalue = pv.current()
+    for defs in pvDefs:
+        pname,desc,spv,extra = defs
+        ivalue = spv.current()
         printv(f'created pv {pname}, initial: {type(ivalue),ivalue}, extra: {extra}')
-        C_.PVs[pargs.prefix+pname] = pv
-        #if isinstance(ivalue,dict):# NTEnum
+        C_.PVs[C_.prefix+pname] = spv
+        v = spv._wrap(ivalue, timestamp=ts)
+        if spv.writable:
+            try:
+                # To indicate that the PV is writable, set control limits to (0,0). Not very elegant, but it works for numerics and enums, not for strings.
+                v['control.limitLow'] = 0
+                v['control.limitHigh'] = 0
+            except KeyError as e:
+                #print(f'control not set for {pname}: {e}')
+                pass
         if 'ntenum' in str(type(ivalue)):
-            pv.post(ivalue, timestamp=ts)
+            spv.post(ivalue, timestamp=ts)
         else:
-            v = pv._wrap(ivalue, timestamp=ts)
             v['display.description'] = desc
-            for field in extra.keys():
+            for field in extra.keys():              
                 if field in ['limitLow','limitHigh','format','units']:
                     v[f'display.{field}'] = extra[field]
                     if field.startswith('limit'):
@@ -125,34 +129,44 @@ def _create_PVs():
                 if field == 'valueAlarm':
                     for key,value in extra[field].items():
                         v[f'valueAlarm.{key}'] = value
-            pv.post(v)
+            spv.post(v)
 
         # add new attributes. To my surprise that works!
-        pv.name = pname
-        pv.setter = extra.get('setter')
+        spv.name = pname
+        spv.setter = extra.get('setter')
 
-        writable = 'W' in features
-        if writable:
-            @pv.put
-            def handle(pv, op):
+        if spv.writable:
+            @spv.put
+            def handle(spv, op):
                 ct = time.time()
                 vv = op.value()
                 vr = vv.raw.value
+                current = spv._wrap(spv.current())
+                # check limits, if they are defined. That will be a good example of using control structure and valueAlarm.
+                try:
+                    limitLow = current['control.limitLow']
+                    limitHigh = current['control.limitHigh']
+                    if limitLow != limitHigh and not (limitLow <= vr <= limitHigh):
+                        printw(f'Value {vr} is out of limits [{limitLow}, {limitHigh}]. Ignoring.')
+                        op.done(error=f'Value out of limits [{limitLow}, {limitHigh}]')
+                        return
+                except KeyError:
+                    pass
                 if isinstance(vv, ntenum):
                     vr = vv
-                if pv.setter:
-                    pv.setter(vr)
-                    # value could change by the setter
-                    vr = pvv(pv.name)
-                printv(f'putting {pv.name} = {vr}')
-                pv.post(vr, timestamp=ct) # update subscribers
+                if spv.setter:
+                    spv.setter(vr)
+                    # value will be updated by the setter, so get it again
+                    vr = pvv(spv.name)
+                printv(f'putting {spv.name} = {vr}')
+                spv.post(vr, timestamp=ct) # update subscribers
                 op.done()
-        #print(f'PV {pv.name} created: {pv}')
+        #print(f'PV {pv.name} created: {spv}')
 #,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 #``````````````````Setters
 def set_verbosity(level):
     """Set verbosity level for debugging"""
-    pargs.verbose = level
+    C_.verbose = level
     publish('verbosity',level)
 
 def set_server(state=None):
@@ -164,72 +178,143 @@ def set_server(state=None):
     state = str(state)
     if state == 'Start':
         printi('Starting the server')
-        #configure_scope()
-        #adopt_local_setting()
+        # configure_instrument()
+        # adopt_local_setting()
         publish('server','Started')
+        publish('status','Started')
     elif state == 'Stop':
         printi('server stopped')
         publish('server','Stopped')
+        publish('status','Stopped')
     elif state == 'Exit':
         printi('server is exiting')
         publish('server','Exited')
+        publish('status','Exited')
     elif state == 'Clear':
         publish('acqCount', 0)
-        #publish('lostTrigs', 0)
-        #C_.triggersLost = 0
         publish('status','Cleared')
         # set server to previous state
         set_server(C_.serverState)
     C_.serverState = state
 
-def poll():
-    """Example of polling function"""
-    C_.cycle += 1
-    printv(f'cycle {C_.cycle}')
-    publish('cycle', C_.cycle)
-
-def create_PVs(pvDefs:list):
-    """Creates manadatory PVs and adds PVs, using definitions from pvDEfs list"""
+def create_PVs(pvDefs=None):
+    """Creates manadatory PVs and adds PVs specified in pvDefs list"""
     U,LL,LH = 'units','limitLow','limitHigh'
     C_.PVDefs = [
-['version', 'Program version',  SPV(__version__),    'R', {}],
-['status',  'Server status',    SPV('?'),   'W', {}],
+['version', 'Program version',  SPV(__version__), {}],
+['status',  'Server status',    SPV('?','W'), {}],
 ['server',  'Server control',   
-    SPV('Start Stop Clear Exit Started Stopped Exited'.split(), 'enum'), 
-    'W', {'setter':set_server}],
-['verbosity', 'Debugging verbosity', SPV(0,'U8'), 'W',
-    {'setter':set_verbosity}],
-['polling', 'Polling interval', SPV(1.0), 'W', {U:'S', LL:0.001, LH:10.1}],
-['cycle',   'Cycle number',         SPV(0,'U32'), 'R',  {}],
+    SPV('Start Stop Clear Exit Started Stopped Exited'.split(), 'WE'),
+        {'setter':set_server}],
+['verbosity', 'Debugging verbosity', SPV(0,'W','u8'),
+        {'setter':set_verbosity}],
+['polling', 'Polling interval', SPV(1.0,'W'), {U:'S', LL:0.001, LH:10.1}],
+['cycle',   'Cycle number',         SPV(0,'','u32'), {}],
     ]
-    # append application PVs, defined in define_PVs()
-    C_.PVDefs += pvDefs
-    _create_PVs()
+    # append application's PVs, defined in the pvDefs and create map of providers
+    if pvDefs is not None:
+        C_.PVDefs += pvDefs
+    _create_PVs(C_.PVDefs)
     return C_.PVs
 
-#``````````````````Example of the Main() function````````````````````````````
+def get_externalPV(pvName, timeout=0.5):
+    """Get value of PV from another server. That can be used to check if the server is already running, or to get values from other servers."""
+    ctxt = Context('pva')
+    return ctxt.get(pvName, timeout=timeout)
+
+def init_epicsdev(prefix, pvDefs, verbose=0):
+    """Check if no other server is running with the same prefix, create PVs and return them as a dictionary."""
+    C_.prefix = prefix
+    C_.verbose = verbose
+    try:
+        get_externalPV(prefix+'version')
+        print(f'Server for {prefix} already running. Exiting.')
+        sys.exit(1)
+    except TimeoutError:
+        pass
+    pvs = create_PVs(pvDefs)
+    return pvs
+
+#``````````````````Testing stuff``````````````````````````````````````````````
 if __name__ == "__main__":
+    import numpy as np
+    import argparse
+
+    def myPVDefs():
+        """Example of PV definitions"""
+        SET,U,LL,LH = 'setter','units','limitLow','limitHigh'
+        alarm = {'valueAlarm':{'lowAlarmLimit':0, 'highAlarmLimit':100}}
+        return [    # device-specific PVs
+['noiseLevel',  'Noise amplitude',  SPV(1.E-6,'W'), {SET:set_noise}],
+['tAxis',       'Full scale of horizontal axis', SPV([0.]), {U:'S'}],
+['recordLength','Max number of points',     SPV(100,'W','u32'),
+    {LL:4,LH:1000000, SET:set_recordLength}],
+['ch1Offset',   'Offset',  SPV(0.,'W'), {U:'du'}],
+['ch1VoltsPerDiv',  'Vertical scale',       SPV(1E-3,'W'), {U:'V/du'}],
+['timePerDiv',  'Horizontal scale',         SPV(1.E-6,'W'), {U:'S/du'}],
+['ch1Waveform', 'Waveform array',           SPV([0.]), {}],
+['ch1Mean',     'Mean of the waveform',     SPV(0.,'A'), {}],
+['ch1Peak2Peak','Peak-to-peak amplitude',   SPV(0.,'A'), {}],
+['alarm',       'PV with alarm',            SPV(0,'WA'), alarm],
+        ]
+    nPatterns = 100 # number of patterns in the waveform.
+    pargs = None
+    nDivs = 10 # number of divisions on the oscilloscope screen. That is needed to set tAxis when recordLength is changed.                          
+
+    def set_recordLength(value):
+        """Record length have changed. The tAxis should be updated accordingly."""
+        printi(f'Setting tAxis to {value}')
+        publish('tAxis', np.arange(value)*pvv('timePerDiv')/nDivs)
+        publish('recordLength', value)
+
+    def set_noise(level):
+        """Noise level have changed. Update noise array."""
+        printi(f'Setting noise level to {level}')
+        pargs.noise = np.random.normal(scale=0.5*level, size=pargs.npoints+nPatterns)
+        #printv(f'Noise array updated with level {level}: {pargs.noise}')
+        publish('noiseLevel', level)
+    
+    def init(recordLength):
+        """Testing function. Do not use in production code."""
+        set_recordLength(recordLength)
+        set_noise(pvv('noiseLevel'))
+
+    def poll():
+        """Example of polling function"""
+        pattern = C_.cycle % nPatterns
+        C_.cycle += 1
+        printv(f'cycle {C_.cycle}')
+        publish('cycle', C_.cycle)
+        wf = pargs.noise[pattern:pattern+pvv('recordLength')].copy()
+        wf *= pvv('ch1VoltsPerDiv')*nDivs
+        wf += pvv('ch1Offset')
+        publish('ch1Waveform', wf)
+        publish('ch1Peak2Peak', np.ptp(wf))
+        publish('ch1Mean', np.mean(wf))
+
     # Argument parsing
     parser = argparse.ArgumentParser(description = __doc__,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     epilog=f'{__version__}')
-    parser.add_argument('-c','--channels', type=int, default=4, help=
-        'Number of channels in the scope')
-    parser.add_argument('-p', '--prefix', default='epicsDev:', help=
-        'Prefix to be prepended to all PVs')
-    parser.add_argument('-l', '--listPVs', action='store_true', help=\
-    'List all generated PVs')
-    parser.add_argument('-v', '--verbose', action='count', default=0, help=\
-    'Show more log messages (-vv: show even more)')
+    parser.add_argument('-l', '--listPVs', action='store_true', help=
+'List all generated PVs')
+    parser.add_argument('-p', '--prefix', default='epicsDev0:', help=
+'Prefix to be prepended to all PVs')
+    parser.add_argument('-n', '--npoints', type=int, default=100, help=
+'Number of points in the waveform')
+    parser.add_argument('-v', '--verbose', action='count', default=0, help=
+'Show more log messages (-vv: show even more)')
     pargs = parser.parse_args()
 
-    PVs = create_PVs(_define_PVs())# Provide your PV definitions instead of _define_PVs()
-
-    # List the PVs
+    # Initialize epicsdev and PVs
+    PVs = init_epicsdev(pargs.prefix, myPVDefs(), pargs.verbose)
     if pargs.listPVs:
-        print(f'List of PVs:')
-        for pvname in PVs:
-            print(pvname)
+        print('List of PVs:')
+        for _pvname in PVs:
+            print(_pvname)
+
+    # Initialize the device, using pargs if needed. That can be used to set the number of points in the waveform, for example.
+    init(pargs.npoints)
 
     # Start the Server. Use your set_server, if needed.
     set_server('Start')
@@ -237,8 +322,11 @@ if __name__ == "__main__":
     # Main loop
     server = Server(providers=[PVs])
     printi(f'Server started with polling interval {repr(pvv("polling"))} S.')
-    while not C_.serverState.startswith('Exit'):
-        time.sleep(pvv("polling"))
-        if not C_.serverState.startswith('Stop'):
+    while True:
+        state = serverState()
+        if state.startswith('Exit'):
+            break
+        if not state.startswith('Stop'):
             poll()
+        time.sleep(pvv("polling"))
     printi('Server is exited')
