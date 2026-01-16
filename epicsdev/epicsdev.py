@@ -1,7 +1,8 @@
 """Skeleton and helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
-__version__= 'v1.0.1 26-01-16'# recordLength and noiseLevel setters are fixed, randomized noise patterns
+__version__= 'v1.0.1 26-01-16'# rng range = nPatterns
 #TODO: NTEnums do not have structure display
+#TODO: Add performance counters to demo.
 
 import sys
 import time
@@ -235,7 +236,7 @@ def init_epicsdev(prefix, pvDefs, verbose=0):
     pvs = create_PVs(pvDefs)
     return pvs
 
-#``````````````````Testing stuff``````````````````````````````````````````````
+#``````````````````Demo````````````````````````````````````````````````````````
 if __name__ == "__main__":
     import numpy as np
     import argparse
@@ -260,7 +261,7 @@ if __name__ == "__main__":
     nPatterns = 100 # number of waveform patterns.
     pargs = None
     nDivs = 10 # number of divisions on the oscilloscope screen. That is needed to set tAxis when recordLength is changed.                          
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(nPatterns)
 
     def set_recordLength(value):
         """Record length have changed. The tAxis should be updated accordingly."""
