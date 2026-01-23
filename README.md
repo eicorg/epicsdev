@@ -19,7 +19,9 @@ the EPICS environment. For example the following command will generate 100 of
 1000-pont noisy waveforms and 300 of scalar parameters.
 ```
 python -m epicsdev.multiadc -c100 -n1000
+# The list of served PVs is in /tmp/pvlist/multiadc0.txt
 ```
+
 The GUI for monitoring:<br>
 ```python -m pypeto -c config -f multiadc```
 
