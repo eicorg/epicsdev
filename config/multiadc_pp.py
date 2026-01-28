@@ -1,7 +1,8 @@
 """Pypet page for epicdev.epicsdev module"""
+# pylint: disable=invalid-name
 # format: pypeto 1.2+
-__version__ = 'v0.0.1 2026-01-23'#
-print(f'epicsScope {__version__}')
+__version__ = 'v0.0.2 2026-01-28'# corrected the Plot action
+print(f'multiadc {__version__}')
 
 #``````````````````Definitions````````````````````````````````````````````````
 # python expressions and functions, used in the spreadsheet
@@ -21,8 +22,8 @@ lColor = color('lightGreen')
 
 # definition for plotting cell
 PyPath = 'python -m'
-PaneP2P = ' '.join([f'ch{i+1:01d}Mean ch{i+1:01d}Peak2Peak' for i in range(1)])
-PaneWF = ' '.join([f'ch{i+1:01d}Waveform' for i in range(1)])
+PaneP2P = ' '.join([f'c{i+1:02d}Mean c{i+1:02d}Peak2Peak' for i in range(1)])
+PaneWF = ' '.join([f'c{i+1:02d}Waveform' for i in range(1)])
 #PaneT = 'timing[1] timing[3]'
 Plot = {'Plot':{'launch':
   f'{PyPath} pvplot Y-5:5 -aV:multiadc0: -#0"{PaneP2P}" -#1"{PaneWF}"',# -#2"{PaneT}"',
@@ -83,5 +84,5 @@ string or device:parameter and the value is dictionary of the features.
 ['V/div:']+ChLine('VoltsPerDiv'),
 ['Mean:']+ChLine('Mean'),
 ['Peak2Peak:']+ChLine('Peak2Peak'),
-#['Waveform:']+ChLine('Waveform'),
+['Waveform:']+ChLine('Waveform'),
         ]
