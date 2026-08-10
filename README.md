@@ -1,27 +1,24 @@
 # epicsdev
-Helper module for creating EPICS PVAccess servers.
+EPICS PVAccess servers for various instruments
 
-Demo:
-```
-python pip install epicsdev
-python -m epicsdev.epicsdev -l
-```
-
-To control and plot:
-```
-python pip install pypeto,pvplot
-python -m pypeto -c config -f epicsdev
-```
-
-## Multi-channel waveform generator
+## Simulated instriments:<br>
+###multiadc: Multi-channel waveform generator
 Module **epicdev.multiadc** can generate large amount of data for stress-testing
 the EPICS environment. For example the following command will generate 100 of 
 1000-pont noisy waveforms and 300 of scalar parameters.
 ```
 python -m epicsdev.multiadc -c100 -n1000
-# The list of served PVs is in /tmp/pvlist/multiadc0.txt
 ```
 
-The GUI for monitoring:<br>
-```python -m pypeto -c config -f multiadc```
+## Oscilloscope series
+- RIGOL DHO
+- TEKTRONIX MSO
+- LECROY WAVERUNNER
+- KEYSIGHT (AGILENT) DSO-X
+
+## Magnetometers
+- LAKESHORE (model 421)
+
+## DAQ
+
 
