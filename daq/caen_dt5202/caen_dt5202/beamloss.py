@@ -1,7 +1,9 @@
 """Plugin for the CAEN DT5202 digitizer to read beam loss sensors for Tandem SEU apparatus.
 """
-# pylint: disable=invalid-name
 __version__ = 'v1.0.4 2026-08-05'# J5 re-shuffled acoorrding to Julio.
+# pylint: disable=invalid-name
+# pylint: disable=missing-docstring
+
 from functools import partial
 from dataclasses import dataclass
 import numpy as np
