@@ -1,12 +1,13 @@
 """EPICS PVAccess server for Keysight DSO-X oscilloscopes."""
 # pylint: disable=invalid-name
-__version__ = 'v0.0.2 26-08-13'# Waveforms are published
+__version__ = 'v0.0.2 26-08-20'# Correct tAxis, invert OnOff to match Pheebus rules
 
 import sys
 import time
 from time import perf_counter as timer
 import argparse
 import threading
+from dataclasses import dataclass
 
 import numpy as np
 import pyvisa as visa
@@ -26,6 +27,7 @@ ElapsedTime = {
     'publish_wf': 0.0,
 }
 
+@dataclass(slots=True)
 class C_:
     """Namespace for module state."""
     scope = None
@@ -35,6 +37,7 @@ class C_:
     previousScopeParametersQuery = ''
     channelsTriggered = []
     trigTime = 0.0
+    prevXpreamble = (0., 0., 0.)# xorig, xincr, xref
 
 pargs = None
 
@@ -57,7 +60,7 @@ def myPVDefs():
         ['recLengthR', 'Actual waveform points', 0, {T: 'u32'}],
         ['samplingRate', 'Sampling rate', 0.0, {U: 'Hz'}],
         ['timePerDiv', f'Horizontal scale (1/{NDIVSX} of full scale)', 1e-3,
-            {F: 'W', U: 'S/du', SCPI: ':TIMebase:SCALe', SET: set_scpi}],
+            {F: 'W', U: 'S/div', SCPI: ':TIMebase:SCALe', SET: set_scpi}],
         ['tAxis', 'Horizontal axis array', [0.0], {U: 'S'}],
 
         ['trigger', 'Force trigger action', ['Trigger', 'Force!'], {F: 'WD', SET: set_trigger}],
@@ -78,20 +81,21 @@ def myPVDefs():
 
     # Important: use templates with plain initial values (no SharedPV here).
     channelTemplates = [
-        ['c<n>OnOff', 'Enable/disable channel', ['1', '0'],
+        ['c<n>OnOff', 'Enable/disable channel', ['0', '1'],
             {F: 'WD', SCPI: ':CHANnel<n>:DISPlay', SET: set_scpi}],
         ['c<n>Coupling', 'Channel coupling', ['DC', 'AC'],
             {F: 'WD', SCPI: ':CHANnel<n>:COUPling', SET: set_scpi}],
         ['c<n>VoltsPerDiv', 'Vertical scale', 1e-3,
-            {F: 'W', U: 'V/du', SCPI: ':CHANnel<n>:SCALe', SET: set_scpi, LL: 1e-3, LH: 20.0}],
+            {F: 'W', U: 'V/div', SCPI: ':CHANnel<n>:SCALe', SET: set_scpi, LL: 1e-3, LH: 20.0}],
         ['c<n>VoltOffset', 'Vertical offset', 0.0,
-            {F: 'W', U: 'V', SCPI: ':CHANnel<n>:OFFSet', SET: set_scpi}],
+            {F: 'W', U: 'div', SCPI: ':CHANnel<n>:OFFSet', SET: set_scpi}],
         ['c<n>Waveform', 'Waveform array', [0.0], {U: 'V'}],
         ['c<n>Mean', 'Mean of waveform', 0.0, {U: 'V'}],
         ['c<n>Peak2Peak', 'Peak-to-peak amplitude', 0.0, {U: 'V', **alarm}],
         ['c<n>RMS', 'RMS of waveform', 0.0, {U: 'V'}],
     ]
 
+    # Generate channel PVs for each channel number.
     for ch in range(pargs.channels):
         for pvdef in channelTemplates:
             p = pvdef.copy()
@@ -102,11 +106,9 @@ def myPVDefs():
             pvDefs.append(p)
     return pvDefs
 
-
 def handle_exception(where):
     """Log exception and keep server alive when possible."""
     edev.printe(f'{where}: {sys.exc_info()[1]}')
-
 
 def scopeCmd(cmd: str):
     """Send a command to scope and optionally return reply."""
@@ -117,7 +119,6 @@ def scopeCmd(cmd: str):
         else:
             C_.scope.write(cmd)
     return reply
-
 
 def set_instrCtrl(value, *_):
     """Setter for scope control commands."""
@@ -131,7 +132,6 @@ def set_instrCtrl(value, *_):
     elif action == '*CLS':
         scopeCmd('*CLS')
 
-
 def set_instrCmdS(cmd, *_):
     """Setter for arbitrary SCPI command PV."""
     cmd = str(cmd)
@@ -143,7 +143,6 @@ def set_instrCmdS(cmd, *_):
     except VisaIOError:
         handle_exception(f'in set_instrCmdS({cmd})')
 
-
 def set_trigger(value, *_):
     """Setter for trigger PV."""
     if str(value) == 'Force!':
@@ -153,7 +152,6 @@ def set_trigger(value, *_):
             handle_exception('in set_trigger')
         finally:
             edev.publish('trigger', 'Trigger')
-
 
 def set_recLengthS(value, *_):
     """Setter for record length PV."""
@@ -169,18 +167,27 @@ def set_recLengthS(value, *_):
     except VisaIOError:
         handle_exception('in set_recLengthS')
 
-
 def set_scpi(value, pv, *_):
     """Generic setter for SCPI-backed PVs."""
-    scpi = C_.scpi.get(pv.name)
+    pvname = str(pv.name)
+    edev.printv(f'set_scpi called for {pvname} with value {value}')
+    scpi = C_.scpi.get(pvname)
     if scpi is None:
-        edev.printw(f'No SCPI associated with {pv.name}')
+        edev.printw(f'No SCPI associated with {pvname}')
         return
+
+    # If the PV is an OnOff type, clear the waveform and related PVs when turned off.
+    if 'OnOff' in pvname:
+        if value == '0':
+            edev.publish(f'{pvname[:3]}Waveform', [0.])
+            # edev.publish(f'{pvname[:3]}Peak2Peak', 0.)
+            # edev.publish(f'{pvname[:3]}Mean', 0.)
+            # edev.publish(f'{pvname[:3]}RMS', 0.)
     try:
         scopeCmd(f'{scpi} {value}')
+        edev.printv(f'Sent SCPI command: {scpi} {value}')
     except VisaIOError:
-        handle_exception(f'in set_scpi for {pv.name}')
-
+        handle_exception(f'in set_scpi for {pvname}')
 
 def serverStateChanged(newState: str):
     """Called by epicsdev when server PV changes."""
@@ -198,7 +205,6 @@ def serverStateChanged(newState: str):
     elif newState == 'Exit':
         edev.printi('Exit requested')
 
-
 def configure_scope():
     """Configure waveform transfer format according to Keysight programming style."""
     with Threadlock:
@@ -206,7 +212,6 @@ def configure_scope():
         C_.scope.write(':WAVeform:BYTeorder LSBFirst')
         C_.scope.write(':WAVeform:UNSigned 1')
         C_.scope.write(':WAVeform:POINts:MODE RAW')
-
 
 def init_visa():
     """Initialize VISA resource and validate instrument type."""
@@ -240,7 +245,6 @@ def init_visa():
     if ('KEYSIGHT' not in idn.upper()) and ('AGILENT' not in idn.upper()):
         edev.printw('Connected instrument does not identify as Keysight/Agilent DSO-X')
 
-
 def make_readSettingQuery():
     """Build a compact multi-query SCPI for PVs with SCPI mapping."""
     C_.scpi = {}
@@ -265,7 +269,6 @@ def _convert_value(current_value, text_value: str):
         return float(text_value)
     return text_value
 
-
 def adopt_local_setting():
     """Read current scope settings and update associated PVs."""
     if not C_.readSettingQuery:
@@ -284,7 +287,6 @@ def adopt_local_setting():
     update_scopeParameters()
     refresh_channelsTriggered()
 
-
 def refresh_channelsTriggered():
     """Refresh list of channels to read."""
     C_.channelsTriggered = []
@@ -295,48 +297,12 @@ def refresh_channelsTriggered():
     if not C_.channelsTriggered:
         C_.channelsTriggered = [1]
 
-
 def update_scopeParameters():
     """Update waveform geometry/timing PVs from channel 1 preamble."""
-    #TODO
     return # Disabled for now, as it may be slow and not needed frequently.
-    try:
-        with Threadlock:
-            C_.scope.write(':WAVeform:SOURce CHANnel1')
-            pre = C_.scope.query(':WAVeform:PREamble?').strip()
-    except VisaIOError:
-        handle_exception('in update_scopeParameters')
-        return
-
-    if pre == C_.previousScopeParametersQuery:
-        return
-
-    C_.previousScopeParametersQuery = pre
-    fields = pre.split(',')
-    if len(fields) < 10:
-        edev.printw(f'Unexpected preamble format: {pre}')
-        return
-
-    try:
-        npoints = int(float(fields[2]))
-        xincr = float(fields[4])
-        xorig = float(fields[5])
-        xref = float(fields[6])
-    except ValueError:
-        edev.printw(f'Cannot parse waveform preamble: {pre}')
-        return
-
-    taxis = (np.arange(npoints) - xref) * xincr + xorig
-    edev.publish('tAxis', taxis.tolist())
-    edev.publish('recLengthR', npoints, IF_CHANGED)
-    if xincr > 0:
-        edev.publish('samplingRate', 1.0 / xincr, IF_CHANGED)
-    edev.publish('timePerDiv', npoints * xincr / NDIVSX, IF_CHANGED)
-
 
 def trigger_is_detected():
     """Check trigger state and decide when to read waveform."""
-    ts = timer()
     try:
         trigState = scopeCmd(':TER?')
     except VisaIOError:
@@ -369,22 +335,33 @@ def acquire_waveforms():
             with Threadlock:
                 C_.scope.write(f':WAVeform:SOURce CHANnel{ch}')
                 pre = C_.scope.query(':WAVeform:PREamble?').strip().split(',')
-                data = C_.scope.query_binary_values(':WAVeform:DATA?', datatype='H', container=np.array)
+                data = C_.scope.query_binary_values(':WAVeform:DATA?', datatype='H',
+                    container=np.array)
 
             if len(pre) < 10:
                 edev.printw(f'Unexpected preamble for CH{ch}: {pre}')
                 continue
             edev.printvv(f'received waveform for CH{ch}: {len(data)} points')
+            #print(f'CH{ch} preamble: {pre}')
 
             # Update recLengthR PV if not set yet
             if recLength == 0:
                 recLength = len(data)
                 edev.publish('recLengthR', recLength, IF_CHANGED)
 
+            # Update tAxis PV if waveform geometry changed.
+            xincr, xorig, xref = np.array(np.float32(pre[4:7]), dtype=np.float32)
+            if (xincr, xorig, xref) != C_.prevXpreamble:
+                taxis = (np.arange(len(data)) - xref) * xincr + xorig
+                edev.publish('tAxis', taxis.tolist())
+                edev.publish('samplingRate', 1.0 / xincr)
+                C_.prevXpreamble = (xincr, xorig, xref)
+
             yincr = float(pre[7])
             yorig = float(pre[8])
             yref = float(pre[9])
             offset = float(edev.pvv(f'c{ch:02d}VoltOffset'))
+            #print(f'CH{ch} preamble: yincr={yincr}, yorig={yorig}, yref={yref}, offset={offset}')
 
             v = (data - yref) * yincr + yorig + offset
 
@@ -408,7 +385,6 @@ def acquire_waveforms():
     ElapsedTime['publish_wf'] = round(ts_publish, 6)
     ElapsedTime['acquire_wf'] = round(timer() - ts_total, 6)
 
-
 def periodic_update():
     """Infrequent updates."""
     update_scopeParameters()
@@ -418,19 +394,17 @@ def periodic_update():
         ElapsedTime['publish_wf'],
     ])
 
-
 def poll():
     """Device polling function."""
     if trigger_is_detected():
         acquire_waveforms()
 
-
 def init():
     """Module initialization."""
     init_visa()
     make_readSettingQuery()
-
-
+    edev.publish('VERSION', __version__)
+\
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=__doc__,
