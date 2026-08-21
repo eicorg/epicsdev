@@ -1,7 +1,7 @@
 # epicsdev
 EPICS PVAccess servers for various instruments
 
-## Simulated instriments<br>
+## Simulated instruments<br>
 Multi-channel waveform generator:<br>
 Module **epicdev.multiadc** can generate large amount of data for stress-testing
 the EPICS environment. For example the following command will generate 100 of 
