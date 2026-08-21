@@ -1,6 +1,8 @@
 # keysight_dsox
 
-EPICS PVAccess server for Keysight (Agilent) DSO-X oscilloscopes.
+EPICS PVAccess server for Keysight (Agilent) DSO-X oscilloscopes (may support other series).
+
+<img src="docs/keysight_dsox.jpg" width="50%">
 
 This module connects to a scope via VISA/SCPI, publishes waveform and settings PVs, and exposes writable control PVs for acquisition and trigger configuration.
 
