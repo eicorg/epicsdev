@@ -1,6 +1,6 @@
 """EPICS PVAccess server for Keysight DSO-X oscilloscopes."""
 # pylint: disable=invalid-name
-__version__ = 'v0.0.2 26-08-20'# Correct tAxis, invert OnOff to match Pheebus rules
+__version__ = 'v0.0.2a 26-08-20'# PV run replaced with server, recLengthS removed as it is not supported by Keysight DSO-X
 
 import sys
 import time
@@ -37,6 +37,7 @@ class C_:
     previousScopeParametersQuery = ''
     channelsTriggered = []
     trigTime = 0.0
+    trigState = ''
     prevXpreamble = (0., 0., 0.)# xorig, xincr, xref
 
 pargs = None
@@ -51,12 +52,11 @@ def myPVDefs():
         ['scopeIDN', 'Response to *IDN? query', 'N/A'],
         ['dateTime', 'Scope date & time', 'N/A'],
         ['acqCount', 'Number of waveform acquisitions', 0, {T: 'u32'}],
-        ['lostTrigs', 'Number of lost trigger checks', 0, {T: 'u32'}],
-        ['instrCtrl', 'Scope control command', ['Run', 'Stop', 'AutoScale', '*CLS'], {F: 'WD', SET: set_instrCtrl}],
+        #['lostTrigs', 'Number of lost trigger checks', 0, {T: 'u32'}],
         ['instrCmdS', 'Execute custom SCPI command', '*IDN?', {F: 'W', SET: set_instrCmdS}],
         ['instrCmdR', 'Reply to custom SCPI command', ''],
 
-        ['recLengthS', 'Requested waveform points', 2000, {F: 'W', T: 'u32', LL: 100, LH: 10000000, SET: set_recLengthS}],
+        #['recLengthS', 'Requested waveform points, Not supported', 0],
         ['recLengthR', 'Actual waveform points', 0, {T: 'u32'}],
         ['samplingRate', 'Sampling rate', 0.0, {U: 'Hz'}],
         ['timePerDiv', f'Horizontal scale (1/{NDIVSX} of full scale)', 1e-3,
@@ -64,7 +64,7 @@ def myPVDefs():
         ['tAxis', 'Horizontal axis array', [0.0], {U: 'S'}],
 
         ['trigger', 'Force trigger action', ['Trigger', 'Force!'], {F: 'WD', SET: set_trigger}],
-        ['trigState', 'Current trigger state', '?', {SCPI: ':TER'}],
+        ['trigState', 'Current trigger state: +1 triggered, +0 not triggered', '?', {SCPI: ':TER'}],
         ['trigMode', 'Trigger sweep mode', ['NORM', 'AUTO'],
             {F: 'WD', SCPI: ':TRIGger:SWEep', SET: set_scpi}],
         ['trigDelay', 'Trigger horizontal position', 0.0,
@@ -120,18 +120,6 @@ def scopeCmd(cmd: str):
             C_.scope.write(cmd)
     return reply
 
-def set_instrCtrl(value, *_):
-    """Setter for scope control commands."""
-    action = str(value)
-    if action == 'Run':
-        scopeCmd(':RUN')
-    elif action == 'Stop':
-        scopeCmd(':STOP')
-    elif action == 'AutoScale':
-        scopeCmd(':AUToscale')
-    elif action == '*CLS':
-        scopeCmd('*CLS')
-
 def set_instrCmdS(cmd, *_):
     """Setter for arbitrary SCPI command PV."""
     cmd = str(cmd)
@@ -152,20 +140,6 @@ def set_trigger(value, *_):
             handle_exception('in set_trigger')
         finally:
             edev.publish('trigger', 'Trigger')
-
-def set_recLengthS(value, *_):
-    """Setter for record length PV."""
-    try:
-        npts = int(float(value))
-    except ValueError:
-        edev.printw(f'Invalid recLengthS value: {value}')
-        return
-    try:
-        scopeCmd(f':WAVeform:POINts {npts}')
-        edev.publish('recLengthS', npts)
-        update_scopeParameters()
-    except VisaIOError:
-        handle_exception('in set_recLengthS')
 
 def set_scpi(value, pv, *_):
     """Generic setter for SCPI-backed PVs."""
@@ -298,18 +272,22 @@ def refresh_channelsTriggered():
         C_.channelsTriggered = [1]
 
 def update_scopeParameters():
-    """Update waveform geometry/timing PVs from channel 1 preamble."""
-    return # Disabled for now, as it may be slow and not needed frequently.
+    """Update scope parameters, which may have changed due to user interaction on the scope."""
+    # nothing to do here for now.
+    return
 
 def trigger_is_detected():
     """Check trigger state and decide when to read waveform."""
     try:
-        trigState = scopeCmd(':TER?')
+        r = scopeCmd(':TER?')
+        if r != C_.trigState:
+            C_.trigState = r
+            edev.publish('trigState', C_.trigState)
     except VisaIOError:
         handle_exception('in trigger_is_detected')
         return False
     #print(f'Trigger state: {type(trigState),trigState}')
-    return trigState=='+1'
+    return C_.trigState=='+1'
 
 def acquire_waveforms():
     """Acquire waveform data for enabled channels and publish PVs."""
