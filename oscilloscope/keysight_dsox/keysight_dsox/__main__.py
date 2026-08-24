@@ -1,7 +1,6 @@
 """EPICS PVAccess server for Keysight DSO-X oscilloscopes."""
 # pylint: disable=invalid-name
-__version__ = 'v0.0.2a 26-08-20'# PV run replaced with server, recLengthS removed as it is not supported by Keysight DSO-X
-
+__version__ = 'v0.0.2 26-08-24'# Vert and Horiz PVs are reflected in the scope, Save/Restore added.
 import sys
 import time
 from time import perf_counter as timer
@@ -15,8 +14,10 @@ from pyvisa.errors import VisaIOError
 
 from epicsdev import epicsdev as edev
 
+MAX_CHANNELS = 8
 # Keysight DSO-X family typically uses 10 horizontal divisions.
 NDIVSX = 10
+NDIVSY = 8
 DEFAULT_VISA_RESOURCE = 'USB0::2391::6052::MY51330356::0::INSTR'
 
 Threadlock = threading.Lock()
@@ -35,10 +36,11 @@ class C_:
     PvDefs = []
     readSettingQuery = ''
     previousScopeParametersQuery = ''
-    channelsTriggered = []
+    channelsEnabled = []
     trigTime = 0.0
     trigState = ''
-    prevXpreamble = (0., 0., 0.)# xorig, xincr, xref
+    prevXpreamble = (0., 0., 0., 0.)# xorig, xincr, xref, recLength
+    prevYpreamble = [(0., 0., 0., 1.)]*MAX_CHANNELS # yorig, yincr, yref, voltsPerDiv
 
 pargs = None
 
@@ -50,7 +52,7 @@ def myPVDefs():
     pvDefs = [
         ['visaResource', 'VISA resource used to access the oscilloscope', pargs.resource],
         ['scopeIDN', 'Response to *IDN? query', 'N/A'],
-        ['dateTime', 'Scope date & time', 'N/A'],
+        ['dateTime', 'Scope date & time', 'N/A'],# {SCPI: "SYSTem:DATE?;:SYSTem:TIME"}],
         ['acqCount', 'Number of waveform acquisitions', 0, {T: 'u32'}],
         #['lostTrigs', 'Number of lost trigger checks', 0, {T: 'u32'}],
         ['instrCmdS', 'Execute custom SCPI command', '*IDN?', {F: 'W', SET: set_instrCmdS}],
@@ -76,6 +78,13 @@ def myPVDefs():
         ['trigLevel', 'Trigger level', 0.0,
             {F: 'W', U: 'V', SCPI: ':TRIGger:EDGE:LEVel', SET: set_scpi}],
 
+        ['setupSlot', 'Setup slot number N used by save/restore', 1,
+            {F: 'W', T: 'u32', LL: 1, LH: 10}],
+        ['saveSetup', 'Save current scope setup to slot N', ['Save'],
+            {F: 'WD', SET: set_saveSetup}],
+        ['restoreSetup', 'Recall scope setup from slot N', ['Restore'],
+            {F: 'WD', SET: set_restoreSetup}],
+
         ['timing', 'Performance timing', [0.0], {U: 'S'}],
     ]
 
@@ -83,7 +92,7 @@ def myPVDefs():
     channelTemplates = [
         ['c<n>OnOff', 'Enable/disable channel', ['0', '1'],
             {F: 'WD', SCPI: ':CHANnel<n>:DISPlay', SET: set_scpi}],
-        ['c<n>Coupling', 'Channel coupling', ['DC', 'AC'],
+        ['c<n>Coupling', 'Channel keysight_dsox/__main__.pycoupling', ['DC', 'AC'],
             {F: 'WD', SCPI: ':CHANnel<n>:COUPling', SET: set_scpi}],
         ['c<n>VoltsPerDiv', 'Vertical scale', 1e-3,
             {F: 'W', U: 'V/div', SCPI: ':CHANnel<n>:SCALe', SET: set_scpi, LL: 1e-3, LH: 20.0}],
@@ -141,6 +150,34 @@ def set_trigger(value, *_):
         finally:
             edev.publish('trigger', 'Trigger')
 
+def _setup_slot() -> int:
+    """Return validated setup slot number N."""
+    try:
+        slot = int(edev.pvv('setupSlot'))
+    except (TypeError, ValueError):
+        slot = 1
+    return max(1, min(10, slot))
+
+def set_saveSetup(value, *_):
+    """Save instrument setup into slot N."""
+    #print(f'set_saveSetup called with value={value}')
+    slot = _setup_slot()
+    try:
+        scopeCmd(f':SAVE:SETup:STARt {slot}')
+        edev.printi(f'Saved setup to slot {slot}')
+    except VisaIOError:
+        handle_exception(f'in set_saveSetup({slot})')
+
+def set_restoreSetup(value, *_):
+    """Recall instrument setup from slot N."""
+    #print(f'set_restoreSetup called with value={value}')    
+    slot = _setup_slot()
+    try:
+        scopeCmd(f':RECall:SETup:STARt {slot}')
+        edev.printi(f'Restored setup from slot {slot}')
+    except VisaIOError:
+        handle_exception(f'in set_restoreSetup({slot})')
+
 def set_scpi(value, pv, *_):
     """Generic setter for SCPI-backed PVs."""
     pvname = str(pv.name)
@@ -169,7 +206,7 @@ def serverStateChanged(newState: str):
         edev.printi('Start requested')
         try:
             configure_scope()
-            adopt_local_setting()
+            adopt_local_setting(C_.readSettingQuery)
             scopeCmd(':RUN')
         except VisaIOError:
             handle_exception('in serverStateChanged(Start)')
@@ -229,7 +266,7 @@ def make_readSettingQuery():
         if scpi:
             C_.scpi[pvname] = scpi
     C_.readSettingQuery = '?;'.join(C_.scpi.values()) + '?'
-    edev.printv(f'readSettingQuery: {C_.readSettingQuery}')
+    #edev.printi(f'readSettingQuery: {C_.readSettingQuery}')
 
 def _convert_value(current_value, text_value: str):
     """Convert SCPI textual value to PV Python type."""
@@ -243,37 +280,40 @@ def _convert_value(current_value, text_value: str):
         return float(text_value)
     return text_value
 
-def adopt_local_setting():
+def adopt_local_setting(query):
     """Read current scope settings and update associated PVs."""
-    if not C_.readSettingQuery:
-        return
-
+    #print(f'adopt_local_setting called with query: {query}')
     try:
         with Threadlock:
-            values = C_.scope.query(C_.readSettingQuery).split(';')
+            values = C_.scope.query(query).split(';')
         for pvname, v in zip(C_.scpi.keys(), values):
             current = edev.pvobj(pvname).current()
             converted = _convert_value(current, v)
+            #print(f'Updating PV {pvname} with value {converted} from scope response {v}')
             edev.publish(pvname, converted, IF_CHANGED)
     except VisaIOError:
-        handle_exception('in adopt_local_setting')
+        handle_exception(f'in adopt_local_setting for query {query}')
 
     update_scopeParameters()
-    refresh_channelsTriggered()
+    refresh_channelsEnabled()
 
-def refresh_channelsTriggered():
+def refresh_channelsEnabled():
     """Refresh list of channels to read."""
-    C_.channelsTriggered = []
+    C_.channelsEnabled = []
     for ch in range(pargs.channels):
         onoff = str(edev.pvv(f'c{ch+1:02d}OnOff')).strip().upper()
         if onoff in ('1', 'ON', 'TRUE'):
-            C_.channelsTriggered.append(ch + 1)
-    if not C_.channelsTriggered:
-        C_.channelsTriggered = [1]
+            C_.channelsEnabled.append(ch + 1)
+    if not C_.channelsEnabled:
+        C_.channelsEnabled = [1]
 
 def update_scopeParameters():
     """Update scope parameters, which may have changed due to user interaction on the scope."""
-    # nothing to do here for now.
+    dateTime = scopeCmd("SYSTem:DATE?;:SYSTem:TIME?")
+    dateTime = dateTime.replace('+', '').replace(';', ',')
+    y, m, d, h, min_, s = dateTime.split(',')
+    dateTime = f"{y}-{m}-{d} {h}:{min_}:{s}"
+    edev.publish('dateTime', dateTime)
     return
 
 def trigger_is_detected():
@@ -294,7 +334,7 @@ def acquire_waveforms():
     ts_total = timer()
     ts_publish = 0.0
 
-    refresh_channelsTriggered()
+    refresh_channelsEnabled()
 
     C_.trigTime = time.time()# TODO: get trigtime from scope if possible
 
@@ -308,7 +348,7 @@ def acquire_waveforms():
         return
 
     recLength = 0
-    for ch in C_.channelsTriggered:
+    for ch in C_.channelsEnabled:
         try:
             with Threadlock:
                 C_.scope.write(f':WAVeform:SOURce CHANnel{ch}')
@@ -323,31 +363,46 @@ def acquire_waveforms():
             #print(f'CH{ch} preamble: {pre}')
 
             # Update recLengthR PV if not set yet
-            if recLength == 0:
-                recLength = len(data)
-                edev.publish('recLengthR', recLength, IF_CHANGED)
+            # if recLength == 0:
+            #     recLength = len(data)
+            #     edev.publish('recLenyincrgthR', recLength, IF_CHANGED)
 
             # Update tAxis PV if waveform geometry changed.
             xincr, xorig, xref = np.array(np.float32(pre[4:7]), dtype=np.float32)
-            if (xincr, xorig, xref) != C_.prevXpreamble:
+            recLength = len(data)
+            if (xincr, xorig, xref, recLength) != C_.prevXpreamble:
+                print(f'Waveform geometry changed: xincr={xincr}, xorig={xorig}, xref={xref}, recLength={recLength}')
                 taxis = (np.arange(len(data)) - xref) * xincr + xorig
-                edev.publish('tAxis', taxis.tolist())
-                edev.publish('samplingRate', 1.0 / xincr)
-                C_.prevXpreamble = (xincr, xorig, xref)
+                edev.publish('tAxis', taxis.tolist(), t=C_.trigTime)
+                edev.publish('samplingRate', 1.0 / xincr, t=C_.trigTime)
+                r = scopeCmd(':TIMebase:SCALe?')
+                edev.publish('timePerDiv', float(r), t=C_.trigTime, ifChanged=True)
+                r = scopeCmd(':TIMebase:POSition?')
+                edev.publish('trigDelay', float(r), t=C_.trigTime, ifChanged=True)
+                C_.prevXpreamble = (xincr, xorig, xref, recLength)
 
-            yincr = float(pre[7])
-            yorig = float(pre[8])
-            yref = float(pre[9])
-            offset = float(edev.pvv(f'c{ch:02d}VoltOffset'))
-            #print(f'CH{ch} preamble: yincr={yincr}, yorig={yorig}, yref={yref}, offset={offset}')
+            # update voltsPerDiv PV if waveform geometry changed.
+            # Note: Keysight DSO-X preamble does not provide enough info for voltsPerDiv, so we read it from the scope.
+            yincr, yorig, yref = np.array(np.float32(pre[7:10]), dtype=np.float32)
+            ich = ch - 1
+            if yincr != C_.prevYpreamble[ich][0]:
+                r = scopeCmd(f':CHANnel{ch}:SCALe?')
+                voltsPerDiv = float(r) if r is not None else 1.0
+                #print(f'CH{ch} yincr changed: {yincr} from {C_.prevYpreamble[ich][0]}, yorig={yorig}, yref={yref}, voltsPerDiv={voltsPerDiv}')
+                edev.publish(f'c{ch:02d}VoltsPerDiv', voltsPerDiv, t=C_.trigTime)
+                C_.prevYpreamble[ich] = (yincr, yorig, yref, voltsPerDiv)
+            voltsPerDiv = C_.prevYpreamble[ich][3]
+            #print(f'CH{ch} preamble: yincr={yincr}, yorig={yorig}, yref={yref}')
 
-            v = (data - yref) * yincr + yorig + offset
+            div = ((data - yref) * yincr)/voltsPerDiv + NDIVSY/2.0 # convert to divisions, center at NDIVSY/2
+            #print(f"mean data: {data.mean()}, div: {div.mean()}")
 
             t0 = timer()
-            edev.publish(f'c{ch:02d}Waveform', v.astype(np.float32).tolist(), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}Peak2Peak', float(np.ptp(v)), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}Mean', float(np.mean(v)), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}RMS', float(np.std(v)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}Waveform', div.astype(np.float32).tolist(), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}Peak2Peak', float(np.ptp(div)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}Mean', float(np.mean(div)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}RMS', float(np.std(div)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}VoltOffset', -yorig, t=C_.trigTime, ifChanged=True)
             ts_publish += timer() - t0
 
         except VisaIOError:
@@ -382,7 +437,8 @@ def init():
     init_visa()
     make_readSettingQuery()
     edev.publish('VERSION', __version__)
-\
+
+#``````````````````Main entry point```````````````````
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=__doc__,
