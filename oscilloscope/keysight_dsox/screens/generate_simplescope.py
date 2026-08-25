@@ -1,5 +1,5 @@
 """Generate a simple Phoebus screen for Keysight DSO-X PVs."""
-__version__ = 'v0.0.2 2026-08-24'# refactored, added --title option
+__version__ = 'v0.0.3 2026-08-25'# Y axis min/max fixed to -4.0/4.0
 
 import argparse
 from pathlib import Path
@@ -41,6 +41,7 @@ def main() -> None:
         "trigState": w.TextUpdate("trigState", f"{prefix}trigState", 100, 38, 40, 20),
         "sleep_lbl": w.Label("sleep_lbl", "Sleep:", 150, 38, 40, 20),
         "sleep": w.TextEntry("sleep", f"{prefix}sleep", 190, 38, 60, 20),
+        "cycleTime": w.TextUpdate("cycleTime", f"{prefix}cycleTime", 260, 38, 60, 20),
         "acq_lbl": w.Label("acq_lbl", "Acq Count:", 380, 38, 80, 20),
         "acqCount": w.TextUpdate("acqCount", f"{prefix}acqCount", 460, 38, 60, 20),
         "lost_lbl": w.Label("lost_lbl", "Lost Trigs:", 540, 38, 70, 20),
@@ -70,40 +71,40 @@ def main() -> None:
         #"wf_lbl": w.Label("wf_lbl", "Waveforms", 10, 110, 960, 420),
         "wf_plot": w.XYPlot("wf_plot", 10, 110, 930, 450),
 
-        "OnOff_lbl": w.Label("OnOff_lbl", "On/Off:", 10, 560, 70, 20),
-        "c01OnOff": w.BooleanButton("c01OnOff", f"{prefix}c01OnOff", 90, 560, 100, 20),
-        "c02OnOff": w.BooleanButton("c02OnOff", f"{prefix}c02OnOff", 210, 560, 100, 20),
-        "c03OnOff": w.BooleanButton("c03OnOff", f"{prefix}c03OnOff", 330, 560, 100, 20),
-        "c04OnOff": w.BooleanButton("c04OnOff", f"{prefix}c04OnOff", 450, 560, 100, 20),
-        "mean_lbl": w.Label("mean_lbl", "Mean [V]:", 10, 585, 70, 20),
-        "c01Mean": w.TextUpdate("c01Mean", f"{prefix}c01Mean", 90, 585, 100, 20),
-        "c02Mean": w.TextUpdate("c02Mean", f"{prefix}c02Mean", 210, 585, 100, 20),
-        "c03Mean": w.TextUpdate("c03Mean", f"{prefix}c03Mean", 330, 585, 100, 20),
-        "c04Mean": w.TextUpdate("c04Mean", f"{prefix}c04Mean", 450, 585, 100, 20),
+        "vpd_lbl": w.Label("vpd_lbl", "Volts/Div:", 10, 560, 70, 20),
+        "c01VoltsPerDiv": w.TextEntry("c01VoltsPerDiv", f"{prefix}c01VoltsPerDiv", 90, 560, 100, 20),
+        "c02VoltsPerDiv": w.TextEntry("c02VoltsPerDiv", f"{prefix}c02VoltsPerDiv", 210, 560, 100, 20),
+        "c03VoltsPerDiv": w.TextEntry("c03VoltsPerDiv", f"{prefix}c03VoltsPerDiv", 330, 560, 100, 20),
+        "c04VoltsPerDiv": w.TextEntry("c04VoltsPerDiv", f"{prefix}c04VoltsPerDiv", 450, 560, 100, 20),
 
-        "rms_lbl": w.Label("rms_lbl", "RMS [V]:", 10, 610, 70, 20),
-        "c01RMS": w.TextUpdate("c01RMS", f"{prefix}c01RMS", 90, 610, 100, 20),
-        "c02RMS": w.TextUpdate("c02RMS", f"{prefix}c02RMS", 210, 610, 100, 20),
-        "c03RMS": w.TextUpdate("c03RMS", f"{prefix}c03RMS", 330, 610, 100, 20),
-        "c04RMS": w.TextUpdate("c04RMS", f"{prefix}c04RMS", 450, 610, 100, 20),
+        "voff_lbl": w.Label("voff_lbl", "Offset:", 10, 585, 70, 20),
+        "c01Offset": w.TextEntry("c01Offset", f"{prefix}c01Offset", 90, 585, 100, 20),
+        "c02Offset": w.TextEntry("c02Offset", f"{prefix}c02Offset", 210, 585, 100, 20),
+        "c03Offset": w.TextEntry("c03Offset", f"{prefix}c03Offset", 330, 585, 100, 20),
+        "c04Offset": w.TextEntry("c04Offset", f"{prefix}c04Offset", 450, 585, 100, 20),
 
-        "p2p_lbl": w.Label("p2p_lbl", "P2P [V]:", 10, 635, 70, 20),
-        "c01Peak2Peak": w.TextUpdate("c01Peak2Peak", f"{prefix}c01Peak2Peak", 90, 635, 100, 20),
-        "c02Peak2Peak": w.TextUpdate("c02Peak2Peak", f"{prefix}c02Peak2Peak", 210, 635, 100, 20),
-        "c03Peak2Peak": w.TextUpdate("c03Peak2Peak", f"{prefix}c03Peak2Peak", 330, 635, 100, 20),
-        "c04Peak2Peak": w.TextUpdate("c04Peak2Peak", f"{prefix}c04Peak2Peak", 450, 635, 100, 20),
+        "OnOff_lbl": w.Label("OnOff_lbl", "On/Off:", 10, 610, 70, 20),
+        "c01OnOff": w.BooleanButton("c01OnOff", f"{prefix}c01OnOff", 90, 610, 100, 20),
+        "c02OnOff": w.BooleanButton("c02OnOff", f"{prefix}c02OnOff", 210, 610, 100, 20),
+        "c03OnOff": w.BooleanButton("c03OnOff", f"{prefix}c03OnOff", 330, 610, 100, 20),
+        "c04OnOff": w.BooleanButton("c04OnOff", f"{prefix}c04OnOff", 450, 610, 100, 20),
+        "mean_lbl": w.Label("mean_lbl", "Mean [V]:", 10, 635, 70, 20),
+        "c01Mean": w.TextUpdate("c01Mean", f"{prefix}c01Mean", 90, 635, 100, 20),
+        "c02Mean": w.TextUpdate("c02Mean", f"{prefix}c02Mean", 210, 635, 100, 20),
+        "c03Mean": w.TextUpdate("c03Mean", f"{prefix}c03Mean", 330, 635, 100, 20),
+        "c04Mean": w.TextUpdate("c04Mean", f"{prefix}c04Mean", 450, 635, 100, 20),
 
-        "vpd_lbl": w.Label("vpd_lbl", "Volts/Div:", 10, 660, 70, 20),
-        "c01VoltsPerDiv": w.TextEntry("c01VoltsPerDiv", f"{prefix}c01VoltsPerDiv", 90, 660, 100, 20),
-        "c02VoltsPerDiv": w.TextEntry("c02VoltsPerDiv", f"{prefix}c02VoltsPerDiv", 210, 660, 100, 20),
-        "c03VoltsPerDiv": w.TextEntry("c03VoltsPerDiv", f"{prefix}c03VoltsPerDiv", 330, 660, 100, 20),
-        "c04VoltsPerDiv": w.TextEntry("c04VoltsPerDiv", f"{prefix}c04VoltsPerDiv", 450, 660, 100, 20),
+        "rms_lbl": w.Label("rms_lbl", "RMS [V]:", 10, 660, 70, 20),
+        "c01RMS": w.TextUpdate("c01RMS", f"{prefix}c01RMS", 90, 660, 100, 20),
+        "c02RMS": w.TextUpdate("c02RMS", f"{prefix}c02RMS", 210, 660, 100, 20),
+        "c03RMS": w.TextUpdate("c03RMS", f"{prefix}c03RMS", 330, 660, 100, 20),
+        "c04RMS": w.TextUpdate("c04RMS", f"{prefix}c04RMS", 450, 660, 100, 20),
 
-        "voff_lbl": w.Label("voff_lbl", "Volt Offset:", 10, 685, 70, 20),
-        "c01VoltOffset": w.TextEntry("c01VoltOffset", f"{prefix}c01VoltOffset", 90, 685, 100, 20),
-        "c02VoltOffset": w.TextEntry("c02VoltOffset", f"{prefix}c02VoltOffset", 210, 685, 100, 20),
-        "c03VoltOffset": w.TextEntry("c03VoltOffset", f"{prefix}c03VoltOffset", 330, 685, 100, 20),
-        "c04VoltOffset": w.TextEntry("c04VoltOffset", f"{prefix}c04VoltOffset", 450, 685, 100, 20),
+        "p2p_lbl": w.Label("p2p_lbl", "P2P [V]:", 10, 685, 70, 20),
+        "c01Peak2Peak": w.TextUpdate("c01Peak2Peak", f"{prefix}c01Peak2Peak", 90, 685, 100, 20),
+        "c02Peak2Peak": w.TextUpdate("c02Peak2Peak", f"{prefix}c02Peak2Peak", 210, 685, 100, 20),
+        "c03Peak2Peak": w.TextUpdate("c03Peak2Peak", f"{prefix}c03Peak2Peak", 330, 685, 100, 20),
+        "c04Peak2Peak": w.TextUpdate("c04Peak2Peak", f"{prefix}c04Peak2Peak", 450, 685, 100, 20),
         "scpi_lbl": w.Label("scpi_lbl", "SCPI:", 10, 715, 50, 20),
         "instrCmdS": w.TextEntry("instrCmdS", f"{prefix}instrCmdS", 50, 715, 200, 20),
         "instrCmdR": w.TextEntry("instrCmdR", f"{prefix}instrCmdR", 260, 715, 550, 20),
@@ -117,7 +118,7 @@ def main() -> None:
         widgets["trigSlope"].item(item)
     for item in "NORM, AUTO".split(", "):
         widgets["trigMode"].item(item)
-    widgets["sleep"].precision(1)
+    widgets["sleep"].precision(2)
     widgets["timePerDiv"].format('Exponential')
     widgets["timePerDiv"].precision(1)
     widgets["reclenR"].format('Decimal')
@@ -148,8 +149,8 @@ def main() -> None:
     y_axis = w.XYPlotYAxis()
     y_axis.title("Divisions")
     #y_axis.auto_scale(True)
-    y_axis.minimum(0)
-    y_axis.maximum(8)
+    y_axis.minimum(-4.0)
+    y_axis.maximum(4.0)
     y_axis.show_grid(True)
 
     trace1 = w.XYPlotTrace()
