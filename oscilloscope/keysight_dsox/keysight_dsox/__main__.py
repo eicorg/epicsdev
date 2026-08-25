@@ -1,11 +1,10 @@
 """EPICS PVAccess server for Keysight DSO-X oscilloscopes."""
 # pylint: disable=invalid-name
-__version__ = 'v0.0.2 26-08-24'# Vert and Horiz PVs are reflected in the scope, Save/Restore added.
+__version__ = 'v0.0.3 26-08-25'# No Threadlock, because it is single-threaded. Y axis min/max fixed to -4.0/4.0 
 import sys
 import time
 from time import perf_counter as timer
 import argparse
-import threading
 from dataclasses import dataclass
 
 import numpy as np
@@ -17,10 +16,8 @@ from epicsdev import epicsdev as edev
 MAX_CHANNELS = 8
 # Keysight DSO-X family typically uses 10 horizontal divisions.
 NDIVSX = 10
-NDIVSY = 8
 DEFAULT_VISA_RESOURCE = 'USB0::2391::6052::MY51330356::0::INSTR'
 
-Threadlock = threading.Lock()
 IF_CHANGED = True
 ElapsedTime = {
     'trigger_detection': 0.0,
@@ -53,12 +50,12 @@ def myPVDefs():
         ['visaResource', 'VISA resource used to access the oscilloscope', pargs.resource],
         ['scopeIDN', 'Response to *IDN? query', 'N/A'],
         ['dateTime', 'Scope date & time', 'N/A'],# {SCPI: "SYSTem:DATE?;:SYSTem:TIME"}],
-        ['acqCount', 'Number of waveform acquisitions', 0, {T: 'u32'}],
-        #['lostTrigs', 'Number of lost trigger checks', 0, {T: 'u32'}],
+        ['acqCount', 'Number of accepted waveform', 0, {T: 'u32'}],
+        ['lostTrigs', 'Number of lost triggers', 'N/A'],
         ['instrCmdS', 'Execute custom SCPI command', '*IDN?', {F: 'W', SET: set_instrCmdS}],
         ['instrCmdR', 'Reply to custom SCPI command', ''],
 
-        #['recLengthS', 'Requested waveform points, Not supported', 0],
+        ['recLengthS', 'Requested waveform points, Not supported on Keysight DSO-X', 'N/A'],
         ['recLengthR', 'Actual waveform points', 0, {T: 'u32'}],
         ['samplingRate', 'Sampling rate', 0.0, {U: 'Hz'}],
         ['timePerDiv', f'Horizontal scale (1/{NDIVSX} of full scale)', 1e-3,
@@ -96,7 +93,7 @@ def myPVDefs():
             {F: 'WD', SCPI: ':CHANnel<n>:COUPling', SET: set_scpi}],
         ['c<n>VoltsPerDiv', 'Vertical scale', 1e-3,
             {F: 'W', U: 'V/div', SCPI: ':CHANnel<n>:SCALe', SET: set_scpi, LL: 1e-3, LH: 20.0}],
-        ['c<n>VoltOffset', 'Vertical offset', 0.0,
+        ['c<n>Offset', 'Vertical negative offset', 0.0,
             {F: 'W', U: 'div', SCPI: ':CHANnel<n>:OFFSet', SET: set_scpi}],
         ['c<n>Waveform', 'Waveform array', [0.0], {U: 'V'}],
         ['c<n>Mean', 'Mean of waveform', 0.0, {U: 'V'}],
@@ -122,11 +119,10 @@ def handle_exception(where):
 def scopeCmd(cmd: str):
     """Send a command to scope and optionally return reply."""
     reply = None
-    with Threadlock:
-        if '?' in cmd:
-            reply = C_.scope.query(cmd).strip()
-        else:
-            C_.scope.write(cmd)
+    if '?' in cmd:
+        reply = C_.scope.query(cmd).strip()
+    else:
+        C_.scope.write(cmd)
     return reply
 
 def set_instrCmdS(cmd, *_):
@@ -218,11 +214,10 @@ def serverStateChanged(newState: str):
 
 def configure_scope():
     """Configure waveform transfer format according to Keysight programming style."""
-    with Threadlock:
-        C_.scope.write(':WAVeform:FORMat WORD')
-        C_.scope.write(':WAVeform:BYTeorder LSBFirst')
-        C_.scope.write(':WAVeform:UNSigned 1')
-        C_.scope.write(':WAVeform:POINts:MODE RAW')
+    C_.scope.write(':WAVeform:FORMat WORD')
+    C_.scope.write(':WAVeform:BYTeorder LSBFirst')
+    C_.scope.write(':WAVeform:UNSigned 1')
+    C_.scope.write(':WAVeform:POINts:MODE RAW')
 
 def init_visa():
     """Initialize VISA resource and validate instrument type."""
@@ -284,8 +279,7 @@ def adopt_local_setting(query):
     """Read current scope settings and update associated PVs."""
     #print(f'adopt_local_setting called with query: {query}')
     try:
-        with Threadlock:
-            values = C_.scope.query(query).split(';')
+        values = C_.scope.query(query).split(';')
         for pvname, v in zip(C_.scpi.keys(), values):
             current = edev.pvobj(pvname).current()
             converted = _convert_value(current, v)
@@ -341,8 +335,7 @@ def acquire_waveforms():
     edev.publish('acqCount', edev.pvv('acqCount') + 1)
 
     try:
-        with Threadlock:
-            C_.scope.write(':STOP')
+        C_.scope.write(':STOP')
     except VisaIOError:
         handle_exception('stopping scope in acquire_waveforms')
         return
@@ -350,11 +343,10 @@ def acquire_waveforms():
     recLength = 0
     for ch in C_.channelsEnabled:
         try:
-            with Threadlock:
-                C_.scope.write(f':WAVeform:SOURce CHANnel{ch}')
-                pre = C_.scope.query(':WAVeform:PREamble?').strip().split(',')
-                data = C_.scope.query_binary_values(':WAVeform:DATA?', datatype='H',
-                    container=np.array)
+            C_.scope.write(f':WAVeform:SOURce CHANnel{ch}')
+            pre = C_.scope.query(':WAVeform:PREamble?').strip().split(',')
+            data = C_.scope.query_binary_values(':WAVeform:DATA?', datatype='H',
+                container=np.array)
 
             if len(pre) < 10:
                 edev.printw(f'Unexpected preamble for CH{ch}: {pre}')
@@ -362,23 +354,19 @@ def acquire_waveforms():
             edev.printvv(f'received waveform for CH{ch}: {len(data)} points')
             #print(f'CH{ch} preamble: {pre}')
 
-            # Update recLengthR PV if not set yet
-            # if recLength == 0:
-            #     recLength = len(data)
-            #     edev.publish('recLenyincrgthR', recLength, IF_CHANGED)
-
             # Update tAxis PV if waveform geometry changed.
             xincr, xorig, xref = np.array(np.float32(pre[4:7]), dtype=np.float32)
             recLength = len(data)
             if (xincr, xorig, xref, recLength) != C_.prevXpreamble:
-                print(f'Waveform geometry changed: xincr={xincr}, xorig={xorig}, xref={xref}, recLength={recLength}')
+                #print(f'Waveform geometry changed: xincr={xincr}, xorig={xorig}, xref={xref}, recLength={recLength}')
                 taxis = (np.arange(len(data)) - xref) * xincr + xorig
                 edev.publish('tAxis', taxis.tolist(), t=C_.trigTime)
-                edev.publish('samplingRate', 1.0 / xincr, t=C_.trigTime)
+                edev.publish('samplingRate', 1.0 / xincr, t=C_.trigTime, ifChanged=True)
                 r = scopeCmd(':TIMebase:SCALe?')
                 edev.publish('timePerDiv', float(r), t=C_.trigTime, ifChanged=True)
                 r = scopeCmd(':TIMebase:POSition?')
                 edev.publish('trigDelay', float(r), t=C_.trigTime, ifChanged=True)
+                edev.publish('recLengthR', recLength, t=C_.trigTime, ifChanged=True)
                 C_.prevXpreamble = (xincr, xorig, xref, recLength)
 
             # update voltsPerDiv PV if waveform geometry changed.
@@ -394,15 +382,15 @@ def acquire_waveforms():
             voltsPerDiv = C_.prevYpreamble[ich][3]
             #print(f'CH{ch} preamble: yincr={yincr}, yorig={yorig}, yref={yref}')
 
-            div = ((data - yref) * yincr)/voltsPerDiv + NDIVSY/2.0 # convert to divisions, center at NDIVSY/2
-            #print(f"mean data: {data.mean()}, div: {div.mean()}")
-
+            samplesv = (data - yref) * yincr # convert to divisions
+            #print(f"mean data: {data.mean()}, samplesv: {samplesv.mean()}")
+            samplesd = (samplesv/voltsPerDiv).astype(np.float32)
             t0 = timer()
-            edev.publish(f'c{ch:02d}Waveform', div.astype(np.float32).tolist(), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}Peak2Peak', float(np.ptp(div)), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}Mean', float(np.mean(div)), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}RMS', float(np.std(div)), t=C_.trigTime)
-            edev.publish(f'c{ch:02d}VoltOffset', -yorig, t=C_.trigTime, ifChanged=True)
+            edev.publish(f'c{ch:02d}Waveform', samplesd, t=C_.trigTime)
+            edev.publish(f'c{ch:02d}Peak2Peak', float(np.ptp(samplesv)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}Mean', float(np.mean(samplesv)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}RMS', float(np.std(samplesv)), t=C_.trigTime)
+            edev.publish(f'c{ch:02d}Offset', yorig, t=C_.trigTime, ifChanged=True)
             ts_publish += timer() - t0
 
         except VisaIOError:
@@ -410,8 +398,7 @@ def acquire_waveforms():
             break
 
     try:
-        with Threadlock:
-            C_.scope.write(':RUN')
+        C_.scope.write(':RUN')
     except VisaIOError:
         handle_exception('restarting scope in acquire_waveforms')
 
