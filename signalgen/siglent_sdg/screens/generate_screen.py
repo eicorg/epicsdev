@@ -1,5 +1,5 @@
 """Generate a simple Phoebus screen for Siglent SDG PVs."""
-__version__ = 'v0.0.1 2026-08-25'
+__version__ = 'v0.0.2 2026-08-26'
 
 import argparse
 from pathlib import Path
@@ -90,6 +90,7 @@ def main() -> None:
 		"instrCmdS": w.TextEntry("instrCmdS", f"{prefix}instrCmdS", 65, 320, 250, 20),
 		"reply_lbl": w.Label("reply_lbl", "Reply:", 330, 320, 40, 20),
 		"instrCmdR": w.TextUpdate("instrCmdR", f"{prefix}instrCmdR", 375, 320, 585, 20),
+		"instrCmd2S": w.TextEntry("instrCmd2S", f"{prefix}instrCmd2S", 65, 340, 250, 20),
 	}
 
 	for item in "Start, Stop, Clear, Exit, Started, Stopped, Exited".split(", "):
@@ -115,6 +116,8 @@ def main() -> None:
 	for name in ("c01Amplitude", "c02Amplitude", "c01Offset", "c02Offset", "c01Phase", "c02Phase"):
 		widgets[name].format("Engineering")
 		widgets[name].precision(3)
+
+	widgets["instrCmdR"].wrap_words(False)
 
 	screen.add_widget(list(widgets.values()))
 
