@@ -1,6 +1,6 @@
 """EPICS PVAccess server for LabJack U3 device."""
 # pylint: disable=invalid-name,broad-exception-caught
-__version__ = 'v0.1.0 26-08-27'
+__version__ = 'v0.0.2 26-08-27'
 
 import argparse
 from functools import partial
@@ -37,7 +37,7 @@ class C_:
     numberOfTimersEnabled = 0
     last_hw_read = 0.0
     last_rps_update = 0.0
-    prev_cycle = 0
+    #rev_cycle = 0
 
 def _parse_config_fio(config_fio):
     """Build U3 feedback command lists from FIO/EIO configuration strings."""
@@ -164,7 +164,7 @@ def myPVDefs():
     dac1 = round(C_.D.readRegister(ModBusAddr['DAC1']), 4)
 
     pv_defs = [
-        ['version', 'Version of the device server', __version__],
+        ['dateTime', 'Server local date/time', 'N/A'],
         ['DAC0', 'DAC 0.04-4.95V, 10-bit PWM-based', dac0,
             {F: 'W', U: 'V', LL: 0.0, LH: 4.95, SET: partial(_set_dac, 'DAC0')}],
         ['DAC1', 'DAC 0.04-4.95V, 10-bit PWM-based', dac1,
@@ -205,7 +205,7 @@ def myPVDefs():
             {F: 'W', U: 'ms', LL: 0.0, LH: 65535.0, SET: set_pwm}],
         ['configFIO', ConfigFIO_desc, str(pargs.configFIO)],
         ['hardPoll', 'Hardware polling period', 1.0, {F: 'W', U: 's', LL: 0.01, LH: 60.0}],
-        ['cycle', 'Cycle number', 0, {T: 'u32'}],
+        #['cycle', 'Cycle number', 0, {T: 'u32'}],
         ['tempU3', 'Temperature of the U3 box', 0.0, {U: 'C'}],
         ['rps', 'Cycles per second', 0.0, {U: 'Hz'}],
     ]
@@ -255,9 +255,6 @@ def serverStateChanged(newState: str):
         edev.printi('Exit requested')
 
 def poll():
-    cycle = int(edev.pvv('cycle')) + 1
-    edev.publish('cycle', cycle)
-
     now = time.time()
     hard_poll = float(edev.pvv('hardPoll'))
     if now - C_.last_hw_read >= hard_poll:
@@ -266,13 +263,13 @@ def poll():
 
     if C_.last_rps_update == 0.0:
         C_.last_rps_update = now
-        C_.prev_cycle = cycle
+        #C_.prev_cycle = cycle
     elif now - C_.last_rps_update > 10.0:
-        dt = now - C_.last_rps_update
-        rps = (cycle - C_.prev_cycle) / dt if dt > 0 else 0.0
-        C_.prev_cycle = cycle
-        C_.last_rps_update = now
-        edev.publish('rps', round(rps, 2), ifChanged=True)
+        #dt = now - C_.last_rps_update
+        #rps = (cycle - C_.prev_cycle) / dt if dt > 0 else 0.0
+        #C_.prev_cycle = cycle
+        #C_.last_rps_update = now
+        #edev.publish('rps', round(rps, 2), ifChanged=True)
         try:
             edev.publish('tempU3', round(C_.D.getTemperature() - 273.0, 3), ifChanged=True)
         except Exception:
@@ -361,6 +358,7 @@ if __name__ == '__main__':
         if not state.startswith('Stop'):
             poll()
         if not edev.sleep():
+            #time.sleep(edev.pvv('sleep'))
             periodic_update()
 
     edev.printi('Server is exited')
