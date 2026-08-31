@@ -1,2 +1,2 @@
-Add code to generate Phoebus screen based on caen_fasps module.
-Use epicsdev/oscilloscope/siglent_sdg/screens/generate_simplescope.py as an example.
+Add code to generate Phoebus screen, based on caen_fasps module.
+Use phoebusgen to create the bob file.
