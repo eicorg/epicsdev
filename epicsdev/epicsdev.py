@@ -2,6 +2,7 @@
 # pylint: disable=invalid-name
 __version__= 'v3.3.0 26-05-13'# Do not publish PV in its setter.
 #TODO: Add CBOR-encoded PVs representing arbitrary Python objects, that can be used for storing complex data structures, such as dictionaries, numpy arrays. That will be more efficient than using multiple PVs for each parameter, and more flexible than using JSON-encoded strings.
+#TODO: pulish with ifChanged=True, does not work for arrays
 
 import sys
 import time

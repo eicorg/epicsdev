@@ -1,6 +1,9 @@
 """EPICS PVAccess server for LabJack U3 device."""
 # pylint: disable=invalid-name,broad-exception-caught
-__version__ = 'v0.0.2 26-08-27'
+__version__ = 'v0.0.3 26-08-28'#
+#TODO: Handle input IO. Probably need fast loop for reading inpput IO.
+#TODO: Check Pulse width, it fails when width is > 7000
+#TODO: Check PWM.
 
 import argparse
 from functools import partial
@@ -33,11 +36,11 @@ class C_:
     DIO_read_cmds = []
     DIO_io_numbers = []
     Counter_cmds = []
+    counterValues = []
     timerCounterPinOffset = 0
     numberOfTimersEnabled = 0
     last_hw_read = 0.0
-    last_rps_update = 0.0
-    #rev_cycle = 0
+    ain_prev_values = []
 
 def _parse_config_fio(config_fio):
     """Build U3 feedback command lists from FIO/EIO configuration strings."""
@@ -69,7 +72,7 @@ def _parse_config_fio(config_fio):
             idx = C_.numberOfTimersEnabled + n_counters
             if idx < 2:
                 enable_counter[idx] = True
-                C_.Counter_cmds.append(u3.Counter(i, Reset=True))
+                C_.Counter_cmds.append(u3.Counter(i, Reset=False))
                 n_counters += 1
         elif ch == 'D':
             C_.DIO_read_cmds.append(u3.BitStateRead(i))
@@ -116,6 +119,7 @@ def handle_exception(where):
 def _set_dac(par_name, value, *_):
     try:
         v = float(value)
+        print(f'Setting {par_name} to {v}')
         C_.D.writeRegister(ModBusAddr[par_name], v)
         edev.publish(par_name, v, ifChanged=True)
     except Exception:
@@ -133,26 +137,30 @@ def set_pulse(value, *_):
     try:
         pulse_name = str(value)
         pars = edev.pvv(f'{pulse_name}Pars')
+        print(f'Setting pulse parameters for {pulse_name} to {pars}')
         pulse(io_number=int(pars[0]), duration=int(pars[1]), delay=int(pars[2]), positive=bool(int(pars[3])))
         edev.publish('Pulse', pulse_name, ifChanged=True)
     except Exception:
         handle_exception('in set_pulse')
 
-def set_pwm(*_):
+def set_pwm(value, *_):
     try:
         multiplier = max(1, int(edev.pvv('PWM_multiplier')))
-        pulse_width_ms = float(edev.pvv('PWM_pulseWidth'))
+        pulse_width_ms = float(value)
+        print(f'Setting PWM with multiplier={multiplier}, pulse_width_ms={pulse_width_ms, type(pulse_width_ms)}')
         base_value = 65535
         if pulse_width_ms <= 0:
             edev.printi('Turning off PWM')
-            return
-
         C_.D.configTimerClock(TimerClockBase=3, TimerClockDivisor=multiplier)
         ticks = round((pulse_width_ms * 1000.0) / multiplier)
         ticks = max(0, min(base_value, ticks))
         C_.D.getFeedback(u3.Timer0Config(TimerMode=0, Value=base_value - ticks))
     except Exception:
         handle_exception('in set_pwm')
+
+def _set_pulsePars(pulse_name, value, *_):
+    print(f'Setting pulse parameters for {pulse_name} to {value}')
+    set_pulse(pulse_name)
 
 def myPVDefs():
     F, T, U, LL, LH, SET = 'features', 'type', 'units', 'limitLow', 'limitHigh', 'setter'
@@ -162,6 +170,7 @@ def myPVDefs():
     n_cnt = len(C_.Counter_cmds)
     dac0 = round(C_.D.readRegister(ModBusAddr['DAC0']), 4)
     dac1 = round(C_.D.readRegister(ModBusAddr['DAC1']), 4)
+    print(f'DAC0={dac0}, DAC1={dac1}, n_hv={n_hv}, n_lv={n_lv}, n_cnt={n_cnt}')
 
     pv_defs = [
         ['dateTime', 'Server local date/time', 'N/A'],
@@ -181,13 +190,13 @@ def myPVDefs():
             0,
             {F: 'W', T: 'u8', LL: 0, LH: 1, SET: partial(_set_do, io_num)},
         ])
-        pulse_name = f'PulseFIO{io_num}' if io_num < 8 else f'PulseEIO{io_num - 8}'
+        pulse_name = f'PulseIO{io_num}'
         pulse_legal.append(pulse_name)
         pv_defs.append([
             f'{pulse_name}Pars',
             f'Pulse parameters: ioNumber, duration(-1 infinite), delay, positive for IO {io_num}',
             [io_num, 1000, 0, 1],
-            {F: 'W'},
+            {F: 'W', SET: partial(_set_pulsePars, pulse_name)},
         ])
 
     if not pulse_legal:
@@ -197,17 +206,15 @@ def myPVDefs():
     pv_defs += [
         ['pulseTick', 'The time resolution of pulse parameters', 0.000128, {U: 's'}],
         ['Pulse', 'Trigger a pulse with selected pulse parameters', pulse_legal, {F: 'WD', SET: set_pulse}],
-        ['Count', '32-bit counters', [0] * n_cnt],
+        ['Count', '32-bit counters, accumulated during polling period', [0] * n_cnt],
+        ['frequency', 'Frequency of the counters', [0.0] * n_cnt, {U: 'Hz'}],
         ['PWM_period', 'Period of PWM, 2^16/1MHz', 65.535, {U: 'ms'}],
         ['PWM_multiplier', 'Multiplier of PWM period', 1,
             {F: 'W', T: 'u16', LL: 1, LH: 255, SET: set_pwm}],
-        ['PWM_pulseWidth', 'Pulse width of PWM, if <=0 then PWM is off', 1.0,
+        ['PWM_pulseWidth', 'Pulse width of PWM, if <=0 then PWM is off', 0.,
             {F: 'W', U: 'ms', LL: 0.0, LH: 65535.0, SET: set_pwm}],
         ['configFIO', ConfigFIO_desc, str(pargs.configFIO)],
-        ['hardPoll', 'Hardware polling period', 1.0, {F: 'W', U: 's', LL: 0.01, LH: 60.0}],
-        #['cycle', 'Cycle number', 0, {T: 'u32'}],
         ['tempU3', 'Temperature of the U3 box', 0.0, {U: 'C'}],
-        ['rps', 'Cycles per second', 0.0, {U: 'Hz'}],
     ]
     return pv_defs
 
@@ -218,6 +225,8 @@ def _read_hardware():
             return
 
         bits = C_.D.getFeedback(*cmd)
+        ts = time.time()
+        #print(f'_read_hardware: bits={bits}')
         n_hv = len(C_.AIN_HVs)
         n_lv = len(C_.AIN_LVs)
         n_dio = len(C_.DIO_read_cmds)
@@ -234,17 +243,25 @@ def _read_hardware():
             )
             ain_values.append(round(v, 5))
 
-        edev.publish('AIN_HV', ain_values[:n_hv])
-        edev.publish('AIN_LV', ain_values[n_hv:n_hv + n_lv])
+        if ain_values != C_.ain_prev_values:
+            C_.ain_prev_values = ain_values
+            edev.publish('AIN_HV', ain_values[:n_hv], t=ts)
+            edev.publish('AIN_LV', ain_values[n_hv:n_hv + n_lv], t=ts)
 
         dio_vals = bits[ain_cnt:ain_cnt + n_dio]
         for io_num, value in zip(C_.DIO_io_numbers, dio_vals):
-            edev.publish(f'DIO{io_num}', int(value), ifChanged=True)
+            edev.publish(f'DIO{io_num}', int(value), ifChanged=True, t=ts)
 
         cnt_vals = bits[ain_cnt + n_dio:ain_cnt + n_dio + len(C_.Counter_cmds)]
-        edev.publish('Count', [int(v) for v in cnt_vals], ifChanged=True)
+        freq = []
+        edev.publish('Count', [int(v) for v in cnt_vals], ifChanged=True, t=ts)
+        for i,count in enumerate(cnt_vals):
+            freq.append((count - C_.conterValues[i]) / (ts - C_.last_hw_read) if C_.last_hw_read > 0 else 0.0)
+        edev.publish('frequency', freq, ifChanged=True, t=ts)
     except Exception:
         handle_exception('in _read_hardware')
+    C_.last_hw_read = ts
+    C_.conterValues = cnt_vals
 
 def serverStateChanged(newState: str):
     if newState == 'Start':
@@ -256,28 +273,13 @@ def serverStateChanged(newState: str):
 
 def poll():
     now = time.time()
-    hard_poll = float(edev.pvv('hardPoll'))
-    if now - C_.last_hw_read >= hard_poll:
-        C_.last_hw_read = now
-        _read_hardware()
-
-    if C_.last_rps_update == 0.0:
-        C_.last_rps_update = now
-        #C_.prev_cycle = cycle
-    elif now - C_.last_rps_update > 10.0:
-        #dt = now - C_.last_rps_update
-        #rps = (cycle - C_.prev_cycle) / dt if dt > 0 else 0.0
-        #C_.prev_cycle = cycle
-        #C_.last_rps_update = now
-        #edev.publish('rps', round(rps, 2), ifChanged=True)
-        try:
-            edev.publish('tempU3', round(C_.D.getTemperature() - 273.0, 3), ifChanged=True)
-        except Exception:
-            handle_exception('reading U3 temperature')
-
+    _read_hardware()
 
 def periodic_update():
-    return
+    try:
+        edev.publish('tempU3', round(C_.D.getTemperature() - 273.0, 3), ifChanged=True)
+    except Exception:
+        handle_exception('reading U3 temperature')
 
 def init_u3():
     if u3 is None:
@@ -358,7 +360,6 @@ if __name__ == '__main__':
         if not state.startswith('Stop'):
             poll()
         if not edev.sleep():
-            #time.sleep(edev.pvv('sleep'))
             periodic_update()
 
     edev.printi('Server is exited')
