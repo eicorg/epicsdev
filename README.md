@@ -26,3 +26,6 @@ the EPICS environment. For example the following command will generate 100 of
 - [SIGLENT SDG series](https://siglentna.com/waveform-generators/sdg1000x-plus-series-function-arbitrary-waveform-generators/)
 - [KEYSIGHT 33000 series](https://www.keysight.com/us/en/products/waveform-and-function-generators/benchtop-waveform-function-generators/advanced-waveform-generators.html)
 <img src="signalgen/keysight_33000/docs/signalgen.png" width="400">
+
+## Power Supplies
+- [CAEN FAST-PS](https://www.els-instruments.com/product/fast-ps/)
