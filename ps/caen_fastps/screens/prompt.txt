@@ -1,2 +1,0 @@
-Add code to generate Phoebus screen, based on caen_fasps module.
-Use phoebusgen to create the bob file.

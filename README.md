@@ -1,5 +1,27 @@
 # epicsdev
-EPICS PVAccess servers for various instruments
+Python framework that dramatically reduces the effort required 
+to create EPICS PVAccess servers using p4p library.
+Device support for following instruments have been developed:
+
+## Power Supplies
+- [CAEN FAST-PS](https://github.com/eicorg/epicsdev_ps_caen_fastps)
+
+## Oscilloscope series
+- [KEYSIGHT (AGILENT) DSO-X](https://github.com/eicorg/epicsdev_osc_keysight_dsox)
+- [RIGOL DHO](https://github.com/eicorg/epicsdev_osc_rigol)
+- [TEKTRONIX MSO](https://github.com/eicorg/epicsdev_osc_tektronix_mso)
+- [LECROY WAVERUNNER](https://github.com/eicorg/epicsdev_osc_lecroy_waverunner)
+
+## Signal generators
+- [SIGLENT SDG series](https://github.com/eicorg/epicsdev_siggen_siglent_sdg)
+- [KEYSIGHT 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000
+
+## DAQ
+- [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
+- [Labjack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
+
+## Magnetometers
+- [LAKESHORE (model 421)](https://github.com/eicorg/epicsdev_magn_lakeshore)
 
 ## Simulated instruments<br>
 Multi-channel waveform generator:<br>
@@ -8,24 +30,3 @@ the EPICS environment. For example the following command will generate 100 of
 1000-pont noisy waveforms and 300 of scalar parameters:
 ```python -m epicsdev.multiadc -c100 -n1000```.
 
-## Supported Oscilloscope series
-- [RIGOL DHO](https://www.rigolna.com/products/rigol-digital-oscilloscopes/dho900)
-- [TEKTRONIX MSO](https://www.tek.com/en/oscilloscope-mixed-signal-oscilloscope)
-- [LECROY WAVERUNNER](https://www.teledynelecroy.com/wr9000)
-- [KEYSIGHT (AGILENT) DSO-X](https://www.keysight.com/us/en/product/DSOX3034A/oscilloscope-350-mhz-4-channels.html)
-<img src="oscilloscope/keysight_dsox/docs/keysight_dsox.jpg" width="25%">
-
-
-## Magnetometers
-- [LAKESHORE (model 421)](https://www.lakeshore.com/products/categories/magnetic-products/gaussmeters-teslameters)
-
-## DAQ
-- [CAEN DT5202](https://caen.it/products/dt5202)
-
-## Signal generators
-- [SIGLENT SDG series](https://siglentna.com/waveform-generators/sdg1000x-plus-series-function-arbitrary-waveform-generators/)
-- [KEYSIGHT 33000 series](https://www.keysight.com/us/en/products/waveform-and-function-generators/benchtop-waveform-function-generators/advanced-waveform-generators.html)
-<img src="signalgen/keysight_33000/docs/signalgen.png" width="400">
-
-## Power Supplies
-- [CAEN FAST-PS](https://www.els-instruments.com/product/fast-ps/)
