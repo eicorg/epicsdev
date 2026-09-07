@@ -1,6 +1,17 @@
 # epicsdev
 Python framework that dramatically reduces the effort required 
 to create EPICS PVAccess servers using p4p library.
+Device PVs are described  as a compact list of 
+`[name, description, initial_value, attributes]` tuples.  
+
+The framework handles server creation, periodic updates, autosave/restore,  
+IocStats heartbeat, and PV-put logging automatically. 
+
+Because all device logic lives in a small, well-structured Python file with a  
+predictable pattern, large-language-model (LLM) assistants such as GitHub 
+Copilot can replicate that pattern for any new instruments given only a  
+manufacturer's programming manual.
+
 Device support for following instruments have been developed:
 
 ## Power Supplies
@@ -14,7 +25,7 @@ Device support for following instruments have been developed:
 
 ## Signal generators
 - [SIGLENT SDG series](https://github.com/eicorg/epicsdev_siggen_siglent_sdg)
-- [KEYSIGHT 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000
+- [KEYSIGHT 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000)
 
 ## DAQ
 - [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
