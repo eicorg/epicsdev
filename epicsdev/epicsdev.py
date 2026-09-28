@@ -1,8 +1,8 @@
 """Helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
-__version__= 'v3.3.0 26-05-13'# Do not publish PV in its setter.
-#TODO: Add CBOR-encoded PVs representing arbitrary Python objects, that can be used for storing complex data structures, such as dictionaries, numpy arrays. That will be more efficient than using multiple PVs for each parameter, and more flexible than using JSON-encoded strings.
-#TODO: pulish with ifChanged=True, does not work for arrays
+__version__= 'v3.3.1 26-09-27'# Limits are handled for read-only PVs.
+#TODO: publish with ifChanged=True, does not work for arrays
+#TODO: ifChanged does not work for enums
 
 import sys
 import time
@@ -41,14 +41,14 @@ def _serverStateChanged(newState:str):
     return
 
 class C_():
-    """Storage for module members"""
+    """ Container for module state variables."""
     prefix = ''
     verbose = 0
     startTime = 0.
     cycle = 0
     serverState = ''
     PVs = {}
-    PVDefs = [] 
+    PVDefs = []
     serverStateChanged = _serverStateChanged
     lastCycleTime = timer()
     lastUpdateTime = 0.
@@ -220,7 +220,9 @@ def create_PVs(pvDefs, pvcache=None):
                     if field in ['limitLow','limitHigh','format','units']:
                         ntNamedTuples[f'display.{field}'] = extra[field]
                         if field.startswith('limit'):
-                            ntNamedTuples[f'control.{field}'] = extra[field]
+                            if f'control.{field}' in ntNamedTuples:
+                                ntNamedTuples[f'control.{field}'] = extra[field]
+                            ntNamedTuples[f'display.{field}'] = extra[field]
                     if field == 'valueAlarm':
                         for key,value in extra[field].items():
                             ntNamedTuples[f'valueAlarm.{key}'] = value
