@@ -12,32 +12,39 @@ predictable pattern, large-language-model (LLM) assistants such as GitHub 
 Copilot can replicate that pattern for any new instruments given only a  
 manufacturer's programming manual.
 
-Device support for following instruments have been developed:
+## Automatic generation of PVAccess server and OPI display.
+Using following [detailed instruction](docs.generate_server.md) the development of functional server, 
+supporting basic instrument functions could be implemented in a matter of an hour.
 
-## Power Supplies
+The OPI (Operator Interface) display could also be generated automatically using phoebusgen:
+[instructions](docs.generate_server.md).
+
+## Device support for following instruments have been developed:
+Power Supplies:
 - [CAEN FAST-PS](https://github.com/eicorg/epicsdev_ps_caen_fastps)
+- [CAEN EASY-DRIVER](https://github.com/eicorg/epicsdev_ps_caen_easydriver)
 
-## Oscilloscope series
+Oscilloscope series:
 - [KEYSIGHT (AGILENT) DSO-X](https://github.com/eicorg/epicsdev_osc_keysight_dsox)
 - [RIGOL DHO](https://github.com/eicorg/epicsdev_osc_rigol)
-- [TEKTRONIX MSO](https://github.com/eicorg/epicsdev_osc_tektronix_mso)
+- [TEKTRONIX MSO & DPO](https://github.com/eicorg/epicsdev_osc_tektronix_mso)
 - [LECROY WAVERUNNER](https://github.com/eicorg/epicsdev_osc_lecroy_waverunner)
 
-## Signal generators
+Signal generators:
 - [SIGLENT SDG series](https://github.com/eicorg/epicsdev_siggen_siglent_sdg)
 - [KEYSIGHT 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000)
 
-## DAQ
+Data acquisition systems:
 - [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
 - [Labjack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
 
-## Magnetometers
+Magnetometers:
 - [LAKESHORE (model 421)](https://github.com/eicorg/epicsdev_magn_lakeshore)
 
-## Simulated instruments<br>
-Multi-channel waveform generator:<br>
-Module **epicdev.multiadc** can generate large amount of data for stress-testing
-the EPICS environment. For example the following command will generate 100 of 
+Simulated instruments:
+- [Multi-channel waveform generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/multiadc.py)
+For example the following command will generate 100 of 
 1000-pont noisy waveforms and 300 of scalar parameters:
 ```python -m epicsdev.multiadc -c100 -n1000```.
+- [Multi-peak image generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/imagegen.py).
 
