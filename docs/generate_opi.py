@@ -59,7 +59,7 @@ def main() -> None:
         "server": w.ComboBox("server", f"{prefix}server", 90, y, 110, 20),
         "sleep_lbl": w.Label("sleep_lbl", "Sleep:", 410, y, 40, 20),
         "sleep": w.TextEntry("sleep", f"{prefix}sleep", 450, y, 50, 20),
-        "cycle_lbl": w.Label("cycle_lbl", "Cycle:", 520, y, 40, 20),
+        "cycleTime_lbl": w.Label("cycleTime_lbl", "Period:", 510, y, 50, 20),
         "cycleTime": w.TextUpdate("cycleTime", f"{prefix}cycleTime", 560, y, 60, 20),
         "hb_lbl": w.Label("hb_lbl", "HB:", 640, y, 30, 20),
         "HEARTBEAT": w.TextUpdate("HEARTBEAT", f"{prefix}HEARTBEAT", 670, y, 70, 20),
