@@ -18,6 +18,7 @@ classifiers = [
 ]
 dependencies = [
   "p4p>=4.2.2",
+  "psutil",
 ]
 [project.urls]
 "Homepage" = "https://github.com/eicorg/epicsdev"
