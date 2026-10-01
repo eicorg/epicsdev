@@ -7,11 +7,13 @@ from dataclasses import dataclass
 
 from epicsdev import epicsdev as edev
 
+DEVICE = 'template'
+
 #````````````````````````````````````````````````````````````````````````````
 # Definitions of PVs, their types, units, limits, and setter functions are
 # defined in the myPVDefs() function below.
 def myPVDefs():
-    """Return list of PV definitions for CAEN FAST-PS."""
+    """Return list of PV definitions for device."""
     # abbreviations for PV definition dictionary keys
     F, T, U, LL, LH = 'features', 'type', 'units', 'limitLow', 'limitHigh'
     SET = 'setter'
@@ -62,7 +64,7 @@ if __name__ == '__main__':
 'PV name for logging put operations. Empty means default putlog:dump.')
     parser.add_argument('-v', '--verbose', action='count', default=0, help=
 'Increase verbosity (-vv for more).')
-    parser.add_argument('device', nargs='?', default='template:', help=
+    parser.add_argument('device', nargs='?', default=DEVICE+':', help=
 'Device name, the PV prefix is <device><index>:')
 
     # TODO: add your options here
@@ -71,7 +73,7 @@ if __name__ == '__main__':
     C_.pargs = parser.parse_args()
     if C_.pargs.putlogPV == '':
         C_.pargs.putlogPV = 'putlog:dump'
-    C_.pargs.prefix = f'{C_.pargs.device}{C_.pargs.index}:'
+    C_.pargs.prefix = f'{C_.pargs.device}:{C_.pargs.index}:'
     print(f'Using PV prefix: {C_.pargs.prefix}')
 
     # Initialize PV definitions.
