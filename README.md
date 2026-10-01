@@ -13,11 +13,11 @@ Copilot can replicate that pattern for any new instruments given only a 
 manufacturer's programming manual.
 
 ## Automatic generation of PVAccess server and OPI display.
-Using following [detailed instruction](docs.generate_server.md) the development of functional server, 
+Using following [detailed instruction](docs/generate_server.md) the development of functional server, 
 supporting basic instrument functions could be implemented in a matter of an hour.
 
 The OPI (Operator Interface) display could also be generated automatically using phoebusgen:
-[instructions](docs.generate_server.md).
+[instructions](docs/generate_server.md).
 
 ## Device support for following instruments have been developed:
 Power Supplies:
