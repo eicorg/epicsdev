@@ -1,6 +1,6 @@
 """Helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
-__version__= 'v3.3.1 26-09-27'# Limits are handled for read-only PVs.
+__version__= 'v3.3.2 26-09-28'# in demo __main__.py timestamp polled PVs with the the same time
 #TODO: publish with ifChanged=True, does not work for arrays
 #TODO: ifChanged does not work for enums
 
@@ -576,18 +576,19 @@ if __name__ == "__main__":
         wf = rng.random(pvv('recordLength'))*pvv('noiseLevel')# it takes 5ms for 1M points
         wf /= pvv('c01VoltsPerDiv')
         wf += pvv('c01Offset')
+        tstamp = time.time()
         ts = timer()        
-        publish('c01Waveform', wf)
-        publish('waveform', wf*10)
+        publish('c01Waveform', wf, t=tstamp)
+        publish('waveform', wf*10, t=tstamp)
         _sum['time'] += timer() - ts
         _sum['points'] += len(wf)
-        publish('c01Peak2Peak', np.ptp(wf))
-        publish('c01Mean', np.mean(wf))
+        publish('c01Peak2Peak', np.ptp(wf), t=tstamp)
+        publish('c01Mean', np.mean(wf), t=tstamp)
 
         # For demo purposes, we also publish the waveform as an image. That is not a typical use case, but it shows how to publish 2D arrays.
         dim = int(np.sqrt(len(wf)))
         array2d = (wf*10.)[:dim*dim].reshape([dim, dim])
-        publish('image', array2d.astype('int16'))
+        publish('image', array2d.astype('int16'), t=tstamp)
 
     def periodic_update():
         """Perform periodic update"""
