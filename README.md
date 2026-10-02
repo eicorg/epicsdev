@@ -29,12 +29,17 @@ Follow the [Detailed Server Generation Guide](docs/generate_server.md) to bootst
 You can automatically create an Operator Interface (OPI) layout using [phoebusgen](https://als-epics.github.io/phoebusgen/). See the [OPI Generation Instructions](docs/generate_opi.md) for details.
 
 ### 3. Quick Test (Simulation Mode)
-To see the framework in action without physical hardware, you can launch a simulated multi-channel waveform generator. The following command generates 100 noisy waveforms (1,000 points each) alongside 300 scalar parameters:
+To see the framework in action without physical hardware, you can launch a simulated multi-channel waveform generator, which can be useful for stress-testing of EPICS installations. The following command generates 100 noisy waveforms (1,000 points each) alongside 300 scalar parameters:
 
 ```bash
-python -m epicsdev.multiadc -c 100 -n 1000
+python -m epicsdev.multiadc -C 100 -n 1000
 ```
 
+Other examples to run: single waveform generator and multi-peak image generator
+```bash
+python -m epicsdev.epicsdev
+python -m epicsdev.imagegen
+```
 ---
 
 ## List of fully functional PVAccess servers, developed using epicsdev
