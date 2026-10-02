@@ -13,17 +13,9 @@ uv init
 uv add epicsdev
 ```
 
-Copy the instrument programming manual to:
+Copy the instrument programming manual to: ```misc/programming_manual.pdf```
 
-```text
-misc/programming_manual.pdf
-```
-
-Copy the [server template](https://github.com/eicorg/epicsdev/blob/main/docs/template.py) to:
-
-```text
-my_server/__main__.py
-```
+Copy the [server template](https://github.com/eicorg/epicsdev/blob/main/docs/template.py) to: ```my_server/__main__.py ```
 
 ### Use an AI agent
 
@@ -31,7 +23,6 @@ From the project directory, prompt an AI agent such as GitHub Copilot:
 
 ```text
 Modify my_server/__main__.py to provide EPICS PVAccess support for <instrument name and model>.
-
 Use the programming manual in misc/programming_manual.pdf as the primary reference.
 ```
 
@@ -44,3 +35,9 @@ Add relevant details to the prompt to obtain a better targeted result, for examp
 - Required OPI screens or example configuration
 
 Review the agent’s recommendations, test the server with the real instrument, and refine error handling and recovery behavior as needed.
+
+### Test run
+```
+uv run python -m my_server
+```
+
