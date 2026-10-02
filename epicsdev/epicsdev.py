@@ -1,6 +1,6 @@
 """Helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
-__version__= 'v3.3.2 26-09-28'# in demo __main__.py timestamp polled PVs with the the same time
+__version__= 'v3.3.3 26-10-02'# extra error handling for write_cache and putLog
 #TODO: publish with ifChanged=True, does not work for arrays
 #TODO: ifChanged does not work for enums
 
@@ -132,9 +132,11 @@ def write_cache():
                     pyval = value
             #print(f'Caching {pvName} = {value} of type {type(value)}, python value: {pyval} of type {type(pyval)}')
             pvcacheMap[pvName[len(C_.prefix):]] = {'value': pyval, 'time': time.time()}
-    #print(f'pvCache: {pvcacheMap}')
     C_.cachefd.seek(0)
-    json.dump(pvcacheMap, C_.cachefd)
+    try:
+        json.dump(pvcacheMap, C_.cachefd)
+    except TypeError:
+        printe('in write_cache: could not write cacheMap, one of PVs is not Json-compatible')
     C_.cachefd.truncate()
     C_.cachefd.flush()
 
@@ -462,7 +464,7 @@ def init_epicsdev(prefix:str, pvDefs:list, verbose=0, serverStateChanged=None,
 
     # Set up putlogPV if requested. That will log put operations to a PV, which can be useful for auditing and debugging.
     C_.putlogPV = putlogPV
-    if C_.putlogPV is not None:
+    if C_.putlogPV not in (None,'',):
         try:
             _ = IFace.get(putlogPV, timeout=0.5)
             printi(f'PutLog enabled. Logging put operations to {putlogPV}')
