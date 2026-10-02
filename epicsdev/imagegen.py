@@ -159,19 +159,20 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("-a", "--autosave", nargs="?", default="")
 parser.add_argument("-c", "--recall", action="store_false")
-parser.add_argument("-d", "--device", default="image")
 parser.add_argument("-g", "--generate", nargs="?", default="", help=
     "Generate array PVs on startup: 'r' for row, 's' for statistics'"                    )
-parser.add_argument("-i", "--index", default="0")
+parser.add_argument("-i", "--instance", default="0")
 parser.add_argument("-s", "--shape", default="120,120", help=
     "Initial number of rows and columns in the image."  )
 parser.add_argument("-p", "--putlogPV", default="putlog:dump")
 parser.add_argument("-v", "--verbose", action="count", default=0)
+parser.add_argument('device', nargs='?', default='image:', help=
+    'Device name, the prefix for all generated PVs <prefix><instance>:')
 pargs = parser.parse_args()
 pargs.nrows, pargs.ncols = [int(s) for s in pargs.shape.split(',')]
 printi(f"Parsed arguments: {pargs}")
 
-prefix = f"{pargs.device}{pargs.index}:"
+prefix = f"{pargs.device}{pargs.instance}:"
 pvs = init_epicsdev(
     prefix,
     my_pv_defs(),
