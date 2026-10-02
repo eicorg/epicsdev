@@ -1,50 +1,66 @@
 # epicsdev
 
-`epicsdev` is a Python framework for rapidly developing EPICS PVAccess servers with the [p4p](https://github.com/epics-base/p4p) library.
+`epicsdev` is a Python framework designed for rapidly developing EPICS PVAccess servers utilizing the [p4p](https://github.com/epics-base/p4p) library. 
 
-Device PVs are specified as a compact list of ```[name, description, initial_value, attributes]```tuples. 
-The framework automatically creates the server, performs periodic updates, and implements standard EPICS services: **autosave/restore, IocStats, heartbeat monitoring, and PV-put logging**.
+Device Process Variables (PVs) are defined using a highly compact format:
+```python
+[name, description, initial_value, attributes]
+```
 
-Device-specific logic is contained in a small, well-structured Python file that follows a predictable pattern. Given an instrument programming manual, a large language model (LLM) assistant such as GitHub Copilot can use this pattern to create initial support for a new instrument quickly.
+Device-specific logic resides within a small, well-structured Python file following a predictable pattern. Given an instrument programming manual, an LLM assistant (such as GitHub Copilot) can easily leverage this pattern to spin up initial support for new hardware in under an hour.
 
-## Automatic generation of PVAccess server and OPI display
+---
 
-Follow these [detailed instructions](docs/generate_server.md) to generate a functional PVAccess server supporting the instrument's basic functions. Initial implementation can often be completed within an hour.
+## Key Features
 
-An Operator Interface (OPI) display can also be generated automatically with [phoebusgen](https://als-epics.github.io/phoebusgen/). 
-See [this instructions](docs/generate_opi.md).
+* **Built-in Services:** Out-of-the-box support for autosave/restore, IocStats, heartbeat monitoring, and PV-put logging.
+* **Rapid Prototyping:** Simple, declarative tuple structure for PV definitions.
+* **LLM-Friendly:** Highly predictable boilerplate that allows AI code assistants to write drivers effortlessly.
+* **OPI Integration:** Automated operator interface generation for Phoebus.
 
-## Available device support
+---
 
-Power supplies
-- [CAEN FAST-PS](https://github.com/eicorg/epicsdev_ps_caen_fastps)
-- [CAEN EASY-DRIVER](https://github.com/eicorg/epicsdev_ps_caen_easydriver)
+## Getting Started
+
+### 1. Generate a PVAccess Server
+Follow the [Detailed Server Generation Guide](docs/generate_server.md) to bootstrap a functional PVAccess server supporting your instrument's core functions. 
+
+### 2. Generate an OPI Display
+You can automatically create an Operator Interface (OPI) layout using [phoebusgen](https://als-epics.github.io/phoebusgen/). See the [OPI Generation Instructions](docs/generate_opi.md) for details.
+
+### 3. Quick Test (Simulation Mode)
+To see the framework in action without physical hardware, you can launch a simulated multi-channel waveform generator. The following command generates 100 noisy waveforms (1,000 points each) alongside 300 scalar parameters:
+
+```bash
+python -m epicsdev.multiadc -c 100 -n 1000
+```
+
+---
+
+## List of fully functional PVAccess servers, developed using epicsdev
+
+Power Supplies
+* [CAEN FAST-PS](https://github.com/eicorg/epicsdev_ps_caen_fastps)
+* [CAEN EASY-DRIVER](https://github.com/eicorg/epicsdev_ps_caen_easydriver)
 
 Oscilloscopes
-- [Keysight (Agilent) DSO-X series](https://github.com/eicorg/epicsdev_osc_keysight_dsox)
-- [Rigol DHO series](https://github.com/eicorg/epicsdev_osc_rigol)
-- [Tektronix MSO and DPO series](https://github.com/eicorg/epicsdev_osc_tektronix_mso)
-- [LeCroy WaveRunner series](https://github.com/eicorg/epicsdev_osc_lecroy_waverunner)
+* [Keysight (Agilent) DSO-X series](https://github.com/eicorg/epicsdev_osc_keysight_dsox)
+* [Rigol DHO series](https://github.com/eicorg/epicsdev_osc_rigol)
+* [Tektronix MSO and DPO series](https://github.com/eicorg/epicsdev_osc_tektronix_mso)
+* [LeCroy WaveRunner series](https://github.com/eicorg/epicsdev_osc_lecroy_waverunner)
 
-Signal generators
+Signal Generators
+* [Siglent SDG series](https://github.com/eicorg/epicsdev_siggen_siglent_sdg)
+* [Keysight 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000)
 
-- [Siglent SDG series](https://github.com/eicorg/epicsdev_siggen_siglent_sdg)
-- [Keysight 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000)
-
-Data-acquisition systems
-- [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
-- [LabJack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
+Data Acquisition instruments
+* [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
+* [LabJack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
 
 Magnetometers
-- [Lake Shore Model 421](https://github.com/eicorg/epicsdev_magn_lakeshore)
+* [Lake Shore Model 421](https://github.com/eicorg/epicsdev_magn_lakeshore)
+* [Caylar NMR20](https://github.com/eicorg/epicsdev_magn_caylar_nmr)
 
-Simulated instruments
-- [Multi-channel waveform generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/multiadc.py)
-
-  For example, the following command generates 100 noisy waveforms, each with 1,000 points, and 300 scalar parameters:
-
-  ```bash
-  python -m epicsdev.multiadc -c100 -n1000
-  ```
-
-- [Multi-peak image generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/imagegen.py)
+Simulation Utilities
+* [Multi-channel Waveform Generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/multiadc.py)
+* [Multi-peak Image Generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/imagegen.py)
