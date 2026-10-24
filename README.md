@@ -40,6 +40,7 @@ Other examples to run: single waveform generator and multi-peak image generator
 python -m epicsdev.epicsdev
 python -m epicsdev.imagegen
 ```
+See [imagegen usage](docs/imagegenUsage.md) for more details.
 ---
 
 ## List of fully functional PVAccess servers, developed using epicsdev

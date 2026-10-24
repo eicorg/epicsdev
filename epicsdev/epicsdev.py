@@ -1,5 +1,7 @@
 """Helper functions for creating EPICS PVAccess server"""
 # pylint: disable=invalid-name
+# pylint: disable=line-too-long
+# pylint: disable=broad-exception-caught
 __version__= 'v3.3.3 26-10-02'# extra error handling for write_cache and putLog
 #TODO: publish with ifChanged=True, does not work for arrays
 #TODO: ifChanged does not work for enums
@@ -22,7 +24,7 @@ from p4p.client.thread import Context
 #``````````````````Constants
 PeriodicUpdateInterval = 10. # seconds
 AutosaveInterval = 60. # seconds, interval for saving PV values to a file for autosave feature.
-AutosaveDefaultDirectory = '/operations/app_store/pvCache/' # Fallback autosave directory when OPERATIONS is not set.
+AutosaveDefaultDirectory = '/operations/app_store/pvCache/'# Fallback autosave directory when OPERATIONS is not set.
 IFace = Context('pva')# client context for getting values from other servers
 
 epics2p4p = {# mapping from epics type codes to p4p type codes.
@@ -80,7 +82,7 @@ def printe(msg):
     print(txt)
     publish('status',txt)
 def _printv(msg, level):
-    if C_.verbose >= level: 
+    if C_.verbose >= level:
         print(f'DBG{level}: {msg}')
 def printv(msg):
     """Print debug message if verbosity level >=1."""
@@ -125,7 +127,10 @@ def write_cache():
             if isinstance(value, str):
                 pyval = value
             else:
-                # for discrete PVs, we need to save the index of the current choice, not the choice itself, because the choices can be changed in the next startup. That is a good example of using extra parameters in PV definitions.
+                # for discrete PVs, we need to save the index of the current
+                # choice, not the choice itself, because the choices can be
+                # changed in the next startup. That is a good example of using
+                # extra parameters in PV definitions.
                 try:
                     pyval = value.index
                 except Exception:
@@ -171,11 +176,11 @@ def create_PVs(pvDefs, pvcache=None):
         # Create PV. For multi-dimensional arrays, we always create NTNDArray,
         # that is the most flexible type, and supports all features.
         # For other types, we create NTEnum for discrete PVs, and NTScalar
-        # or NTScalarArray for other PVs, depending on whether the initial 
+        # or NTScalarArray for other PVs, depending on whether the initial
         # value is iterable or not.
         if isinstance(initial, np.ndarray):# Multi-dimensional array.
             printv(f'Creating NTNDArray PV {pname}, initial: {initial}')
-            #TODO:ISSUE:spv = SharedPV(nt=p4p.nt.NTNDArray(display=True))# do not use initial here due to a bug in p4p, also display keyword is not handled.
+            #TODO#:ISSUE:spv = SharedPV(nt=p4p.nt.NTNDArray(display=True))# do not use initial here due to a bug in p4p, also display keyword is not handled.
             spv = SharedPV(nt=p4p.nt.NTNDArray())
             spv.open(initial)
             spv.post(initial, timestamp=ts)
@@ -247,8 +252,8 @@ def create_PVs(pvDefs, pvcache=None):
             spv.name = pname
             spv.setter = extra.get('setter')
 
-            # add a put handler to the PV, that will be called when the PV 
-            # value is changed by a client. The handler will check limits, 
+            # add a put handler to the PV, that will be called when the PV
+            # value is changed by a client. The handler will check limits,
             # call the setter if defined, and update subscribers.
             @spv.put
             def handle(spv, op):
@@ -259,7 +264,8 @@ def create_PVs(pvDefs, pvcache=None):
                 try: # if it is ENum
                     index = oldvr.index
                     oldvr = oldvr.choices[index]
-                except: pass
+                except Exception:
+                    pass
                 #printv(f'oldvr: {type(oldvr)},{oldvr}')
 
                 # check limits, if they are defined.
@@ -285,7 +291,7 @@ def create_PVs(pvDefs, pvcache=None):
                 if C_.putlogPV is not None:
                     dt = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3].split()
                     ip = op.peer().split(':')[3][:-1]# peer looks like: [::ffff:192.168.27.6]:46362
-                    jmsg = {"date":dt[0], "time":dt[1], 
+                    jmsg = {"date":dt[0], "time":dt[1],
                         "host":ip, "user":op.account(),
                         "pv":op.name(), "new":vr, "old":oldvr}
                     s = json.dumps(jmsg)
@@ -579,7 +585,7 @@ if __name__ == "__main__":
         wf /= pvv('c01VoltsPerDiv')
         wf += pvv('c01Offset')
         tstamp = time.time()
-        ts = timer()        
+        ts = timer()
         publish('c01Waveform', wf, t=tstamp)
         publish('waveform', wf*10, t=tstamp)
         _sum['time'] += timer() - ts
@@ -604,7 +610,7 @@ if __name__ == "__main__":
             _sum['points'] = 0
             _sum['time'] = 0.
 
-    # Parse command line arguments  
+    # Parse command line arguments
     parser = argparse.ArgumentParser(description = __doc__,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     epilog=f'{__version__}')
@@ -649,7 +655,7 @@ if __name__ == "__main__":
     # In this example, we just update the waveform,image and its stats in a loop,
     # but in a real application, the loop can also read data from the device,
     # and update PVs accordingly. The loop can be paused by setting server PV to 'Stop',
-    # and exited by setting server PV to 'Exit'. 
+    # and exited by setting server PV to 'Exit'.
     # The performance metrics are updated every {PeriodicUpdateInterval} seconds.
     server = Server(providers=[PVs])
     printi(f'Server started. Sleeping per cycle: {repr(pvv("sleep"))} S.')
