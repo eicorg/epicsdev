@@ -66,6 +66,10 @@ Magnetometers
 * [Lake Shore Model 421](https://github.com/eicorg/epicsdev_magn_lakeshore)
 * [Caylar NMR20](https://github.com/eicorg/epicsdev_magn_caylar_nmr)
 
+Vacuum Gauge Controllers
+* [Granville-Philips 307, 358](https://github.com/eicorg/epicsdev_vac)...
+* [B-RAX 3000 series](https://github.com/eicorg/epicsdev_vac) from InstruTech
+
 Simulation Utilities
 * [Multi-channel Waveform Generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/multiadc.py)
 * [Multi-peak Image Generator](https://github.com/eicorg/epicsdev/blob/main/epicsdev/imagegen.py)
