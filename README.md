@@ -1,6 +1,6 @@
 # epicsdev
 
-`epicsdev` is a Python framework designed for rapidly developing EPICS PVAccess servers utilizing the [p4p](https://github.com/epics-base/p4p) library. 
+`epicsdev` is a Python framework designed for rapidly developing EPICS PVAccess servers using the [p4p](https://github.com/epics-base/p4p) library.
 
 Device Process Variables (PVs) are defined using a highly compact format:
 ```python
@@ -13,6 +13,7 @@ Device-specific logic resides within a small, well-structured Python file follow
 
 ## Key Features
 
+* **High-Bandwidth Data Streaming:** Minimizes packet overhead and uses the optimized p4p bindings to move complex data structures directly.
 * **Built-in Services:** Out-of-the-box support for autosave/restore, IocStats, heartbeat monitoring, and PV-put logging.
 * **Rapid Prototyping:** Simple, declarative tuple structure for PV definitions.
 * **LLM-Friendly:** Highly predictable boilerplate that allows AI code assistants to write drivers effortlessly.
@@ -23,26 +24,30 @@ Device-specific logic resides within a small, well-structured Python file follow
 ## Getting Started
 
 ### 1. Generate a PVAccess Server
-Follow the [Detailed Server Generation Guide](docs/generate_server.md) to bootstrap a functional PVAccess server supporting your instrument's core functions. 
+Follow the [Detailed Server Generation Guide](docs/generate_server.md) to bootstrap a functional PVAccess server supporting your instrument's core functions.
 
 ### 2. Generate an OPI Display
-You can automatically create an Operator Interface (OPI) layout using [phoebusgen](https://als-epics.github.io/phoebusgen/). See the [OPI Generation Instructions](docs/generate_opi.md) for details.
+You can automatically create an operator interface (OPI) layout using [phoebusgen](https://als-epics.github.io/phoebusgen/). See the [OPI Generation Instructions](docs/generate_opi.md) for details.
 
 ### 3. Quick Test (Simulation Mode)
-To see the framework in action without physical hardware, you can launch a simulated multi-channel waveform generator, which can be useful for stress-testing of EPICS installations. The following command generates 100 noisy waveforms (1,000 points each) alongside 300 scalar parameters:
+To see the framework in action without physical hardware, you can launch a simulated multi-channel waveform generator, which can be useful for stress-testing EPICS installations. The following command generates 100 noisy waveforms (1,000 points each) alongside 300 scalar parameters:
 
 ```bash
 python -m epicsdev.multiadc -C 100 -n 1000
 ```
+To change the data publishing frequency, modify the `sleep` PV: `pvput multiadc:0:sleep .1`.
 
-Other examples to run: single waveform generator and multi-peak image generator
+Other examples include a single-waveform generator and a multi-peak image generator:
 ```bash
 python -m epicsdev.epicsdev
 python -m epicsdev.imagegen
 ```
 See [imagegen usage](docs/imagegenUsage.md) for more details.
 
-## List of fully functional PVAccess servers, developed using epicsdev
+### 4. Continuous Integration
+To package epicsdev-based PVAccess servers as standalone Linux executables in your build pipeline, see the [Continuous Integration Guide](docs/epicsdev_continuous_integration.md) for PyInstaller build instructions and dependency requirements.
+
+## Fully Functional PVAccess Servers Developed Using epicsdev
 
 Power Supplies
 * [CAEN FAST-PS](https://github.com/eicorg/epicsdev_ps_caen_fastps)
@@ -58,7 +63,7 @@ Signal Generators
 * [Siglent SDG series](https://github.com/eicorg/epicsdev_siggen_siglent_sdg)
 * [Keysight 33000 series](https://github.com/eicorg/epicsdev_siggen_keysight_33000)
 
-Data Acquisition instruments
+Data Acquisition Instruments
 * [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
 * [LabJack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
 
@@ -67,7 +72,7 @@ Magnetometers
 * [Caylar NMR20](https://github.com/eicorg/epicsdev_magn_caylar_nmr)
 
 Vacuum Gauge Controllers
-* [Granville-Philips 307, 358](https://github.com/eicorg/epicsdev_vac)...
+* [Granville-Phillips 307 and 358](https://github.com/eicorg/epicsdev_vac)
 * [B-RAX 3000 series](https://github.com/eicorg/epicsdev_vac) from InstruTech
 
 Simulation Utilities

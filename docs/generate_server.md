@@ -17,7 +17,24 @@ Copy the instrument programming manual to: ```misc/programming_manual.pdf```
 
 Copy the [server template](https://github.com/eicorg/epicsdev/blob/main/docs/template.py) to: ```my_server/__main__.py ```
 
-### Use an AI agent
+### Check if basic functionality is working
+```bash
+source .venv/bin/activate
+python -m my_server
+```
+Check from another terminal that the server publishes templated PVs:
+```bash
+pvmonitor template:0:cycle template:0:cycleTime
+```
+It should print:
+```bash
+template:0:cycle     2026-10-15 11:04:08.735  61 
+template:0:cycleTime 2026-10-15 11:04:08.735  1.00443 
+template:0:cycle     2026-10-15 11:04:18.777  71 
+template:0:cycleTime 2026-10-15 11:04:18.778  1.00423
+... 
+```
+### Use an AI agent to build the server according to the instrument's programming manual
 
 From the project directory, prompt an AI agent such as GitHub Copilot:
 

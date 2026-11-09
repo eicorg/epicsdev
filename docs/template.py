@@ -1,6 +1,6 @@
 """EPICS PVAccess server for template."""
 # pylint: disable=invalid-name,broad-exception-caught
-__version__ = 'v0.0.2 2026-10-01'# --index replaced with --instance. This is more generic.
+__version__ = 'v0.0.3 2026-10-15'# Force it to write list of PVs to /tmp/pvlist
 
 import argparse
 from dataclasses import dataclass
@@ -84,7 +84,7 @@ if __name__ == '__main__':
         C_.PvDefs,
         C_.pargs.verbose,
         serverStateChanged,
-        '',
+        None,# to write list of PVs to /tmp/pvlist/
         C_.pargs.autosave,
         C_.pargs.recall,
         C_.pargs.putlogPV,
