@@ -1,15 +1,12 @@
 """Simulated multi-channel ADC device server using epicsdev module."""
 # pylint: disable=invalid-name
-__version__= 'v0.1.0 26-10-02'# Conform to epicsdev 3.3.3+
+__version__= 'v0.1.1 09-11-2026'# Print elapsed times
 
-import sys
-import time
+from dataclasses import dataclass
 from time import perf_counter as timer
-import numpy as np
 import argparse
+import numpy as np
 
-#from .epicsdev import  Server, Context, init_epicsdev, serverState, publish
-#from .epicsdev import  pvv, printi, printv, set_server, 
 from epicsdev import epicsdev as edev
 
 def myPVDefs():
@@ -52,6 +49,13 @@ pargs = None
 rng = np.random.default_rng(nPatterns)
 nPoints = 100
 verbose = 0
+ElapsedTime = {'publish': 0.,'update': 0.}
+
+
+@dataclass(slots=True)
+class C_():
+    """Class to hold module-level variables."""
+    cyclesSinceUpdate = 0
 
 def set_recordLength(value):
     """Record length have changed. The tAxis should be updated accordingly."""
@@ -92,25 +96,38 @@ def init(recordLength):
 def poll():
     """Example of polling function"""
     #pattern = C_.cycle % nPatterns# produces sliding
+    C_.cyclesSinceUpdate += 1
     cycle = edev.pvv('cycle')
     edev.printv(f'cycle {repr(cycle)}')
     edev.publish('cycle', cycle + 1)
     for ch in range(pargs.channels):
         pattern = rng.integers(0, nPatterns)
         chstr = f'c{ch+1:02}'
+        ts = timer()
         wf = pargs.noise[pattern:pattern+edev.pvv('recordLength')].copy()
         #print(f'ch{ch}, {pattern}: {wf[0], wf.sum(), wf.mean(), np.mean(wf)}')
         wf /= edev.pvv(f'{chstr}VoltsPerDiv')
         #wf += edev.pvv(f'{chstr}Offset')
         wf += ch
-        edev.publish(f'{chstr}Waveform', list(wf))
-        edev.publish(f'{chstr}Peak2Peak', np.ptp(wf))
-        edev.publish(f'{chstr}Mean', np.mean(wf))
+        peak2peak = np.ptp(wf)
+        mean = np.mean(wf)
+        ts1 = timer()
+        ElapsedTime['update'] = ts1 - ts
+        edev.publish(f'{chstr}Waveform', wf)
+        edev.publish(f'{chstr}Peak2Peak', peak2peak)
+        edev.publish(f'{chstr}Mean', mean)
+        ElapsedTime['publish'] = timer() - ts1# this time will depend on how many clients are connected and how many PVs are being published
 
 def periodic_update():
     """Function called periodically in the main server loop."""
-    edev.printv('Periodic update called.')
-
+    wf = edev.pvv('c01Waveform')
+    edev.printi(f'Elapsed milliseconds during last {C_.cyclesSinceUpdate} cycles:'
+        f'{[(name, round(v*1000,4)) for name, v in ElapsedTime.items()]}'
+        f',  total size of all waveforms is {pargs.channels * pargs.npoints * wf.itemsize / 1024} KB')
+    C_.cyclesSinceUpdate = 0
+    for key in ElapsedTime:
+        ElapsedTime[key] = 0.
+    
 # Argument parsing
 parser = argparse.ArgumentParser(description = __doc__,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -120,7 +137,7 @@ parser.add_argument('-a', '--autosave', nargs='?', default='', help=
 parser.add_argument('-c', '--recall', action='store_false', help=
 'If given: do not restore initial PV values from autosave cache.')
 parser.add_argument('-C', '--channels', type=int, default=6, help=
-'Number of channels per device')
+'Number of channels per device, each channel hosts a waveform, its mean and peak2peak amplitude')
 parser.add_argument('-e', '--external', help=
 'Name of external PV, which controls the server, if 0 then it will be <device>0:')
 parser.add_argument('-l', '--list', default=None, nargs='?', help=
@@ -129,7 +146,7 @@ parser.add_argument('-i', '--instance', default='0', help=
 'Device index, the PV name will be <device><index>:') 
 # The rest of arguments are not essential, they can be changed at runtime using PVs.
 parser.add_argument('-n', '--npoints', type=int, default=nPoints, help=
-'Number of points in the waveform')
+'Number of points in each waveform')
 parser.add_argument('-p', '--putlogPV', nargs='?', default='', help=
 'PV name for logging put operations. Empty means default putlog:dump.')
 parser.add_argument('-v', '--verbose', action='count', default=verbose, help=
