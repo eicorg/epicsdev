@@ -1,10 +1,11 @@
 """Pypet page for epicdev.epicsdev module"""
 # format: pypeto 1.2+
-__version__ = 'v0.0.1 2026-01-16'# 
+__version__ = 'v3.3.4 2026-11-12'# updated to match multiadc and epicsdev versions
 print(f'epicsScope {__version__}')
 
 #``````````````````Definitions````````````````````````````````````````````````
 # python expressions and functions, used in the spreadsheet
+PREFIX = 'epicsDev:0:'
 _ = ''
 def span(x,y=1): return {'span':[x,y]}
 def color(*v): return {'color':v[0]} if len(v)==1 else {'color':list(v)}
@@ -21,16 +22,16 @@ lColor = color('lightGreen')
 
 # definition for plotting cell
 PyPath = 'python -m'
-PaneP2P = ' '.join([f'ch{i+1:01d}Mean ch{i+1:01d}Peak2Peak' for i in range(1)])
-PaneWF = ' '.join([f'ch{i+1:01d}Waveform' for i in range(1)])
+PaneP2P = ' '.join([f'c{i+1:02d}Mean c{i+1:02d}Peak2Peak' for i in range(1)])
+PaneWF = ' '.join([f'c{i+1:02d}Waveform' for i in range(1)])
 #PaneT = 'timing[1] timing[3]'
 Plot = {'Plot':{'launch':
-  f'{PyPath} pvplot Y-5:5 -aV:epicsDev0: -#0"{PaneP2P}" -#1"{PaneWF}"',# -#2"{PaneT}"',
+  f'{PyPath} pvplot Y-5:5 -aV:{PREFIX} -#0"{PaneP2P}" -#1"{PaneWF}"',# -#2"{PaneT}"',
   **lColor, **ButtonFont}}
 print(f'Plot command: {Plot}')
 #``````````````````PyPage Object``````````````````````````````````````````````
 class PyPage():
-    def __init__(self, instance='epicsDev0:',
+    def __init__(self, instance=PREFIX,
             title="Simulated oscilloscope", channels=1):
         """instance: unique name of the page.
         For EPICS it is usually device prefix 
@@ -69,14 +70,14 @@ string or device:parameter and the value is dictionary of the features.
 
         #``````````Abbreviations, used in cell definitions
         def ChLine(suffix):
-            return [f'{D}ch{ch+1:01d}{suffix}' for ch in range(channels)]
+            return [f'{D}c{ch+1:02d}{suffix}' for ch in range(channels)]
         #FOption = ' -file '+logreqMap.get(D,'')
         #``````````mandatory member```````````````````````````````````````````
         self.rows = [
-['Device:', D, {D+'version':span(2,1)},_,_,_,_],
+['Device:', D, {D+'VERSION':span(2,1)},_,_,_,_],
 ['State:', D+'server','cycle:',D+'cycle',_,_,Plot], # 'Recall:', D+'setup',],
 ['Status:', {D+'status': span(8,1)}],
-['Polling Interval:', D+'polling','nPoints:',D+'recordLength',
+['Sleep interval:', D+'sleep','nPoints:',D+'recordLength',
 	'Noise:',D+'noiseLevel',_],
 [{'ATTRIBUTES':color('lightCyan')},
 	'Channels:','CH1','CH2','CH3','CH4','CH5','CH6'],

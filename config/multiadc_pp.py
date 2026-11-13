@@ -7,6 +7,7 @@ print(f'multiadc {__version__}')
 #``````````````````Definitions````````````````````````````````````````````````
 # python expressions and functions, used in the spreadsheet
 _ = ''
+PREFIX = 'multiadc:0:'
 def span(x,y=1): return {'span':[x,y]}
 def color(*v): return {'color':v[0]} if len(v)==1 else {'color':list(v)}
 def font(size): return {'font':['Arial',size]}
@@ -26,12 +27,12 @@ PaneP2P = ' '.join([f'c{i+1:02d}Mean c{i+1:02d}Peak2Peak' for i in range(1)])
 PaneWF = ' '.join([f'c{i+1:02d}Waveform' for i in range(1)])
 #PaneT = 'timing[1] timing[3]'
 Plot = {'Plot':{'launch':
-  f'{PyPath} pvplot Y-5:5 -aV:multiadc0: -#0"{PaneP2P}" -#1"{PaneWF}"',# -#2"{PaneT}"',
+  f'{PyPath} pvplot Y-5:5 -aV:{PREFIX} -#0"{PaneP2P}" -#1"{PaneWF}"',# -#2"{PaneT}"',
   **lColor, **ButtonFont}}
 print(f'Plot command: {Plot}')
 #``````````````````PyPage Object``````````````````````````````````````````````
 class PyPage():
-    def __init__(self, instance='multiadc0:',
+    def __init__(self, instance=PREFIX,
             title="Simulated oscilloscope", channels=6):
         """instance: unique name of the page.
         For EPICS it is usually device prefix 
@@ -74,10 +75,10 @@ string or device:parameter and the value is dictionary of the features.
         #FOption = ' -file '+logreqMap.get(D,'')
         #``````````mandatory member```````````````````````````````````````````
         self.rows = [
-['Device:', D, {D+'version':span(2,1)},_,_,_,_],
+['Device:', D, {D+'VERSION':span(2,1)},_,_,_,_],
 ['State:', D+'server','cycle:',D+'cycle',_,_,Plot], # 'Recall:', D+'setup',],
 ['Status:', {D+'status': span(8,1)}],
-['Polling Interval:', D+'polling','nPoints:',D+'recordLength',
+['Sleep interval:', D+'sleep','nPoints:',D+'recordLength',
 	'Noise:',D+'noiseLevel',_],
 [{'ATTRIBUTES':color('lightCyan')},
 	'Channels:','CH1','CH2','CH3','CH4','CH5','CH6'],
