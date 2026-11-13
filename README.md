@@ -2,7 +2,7 @@
 
 `epicsdev` is a Python framework designed for rapidly developing EPICS PVAccess servers using the [p4p](https://github.com/epics-base/p4p) library.
 
-Device Process Variables (PVs) are defined using a highly compact format:
+Device process variables (PVs) are defined using a compact format:
 ```python
 [name, description, initial_value, attributes]
 ```
@@ -15,7 +15,7 @@ Device-specific logic resides within a small, well-structured Python file follow
 
 * **High-Bandwidth Data Streaming:** Minimizes packet overhead and uses the optimized p4p bindings to move complex data structures directly.
 * **Built-in Services:** Out-of-the-box support for autosave/restore, IocStats, heartbeat monitoring, and PV-put logging.
-* **Rapid Prototyping:** Simple, declarative tuple structure for PV definitions.
+* **Rapid Prototyping:** Simple, declarative format for PV definitions.
 * **LLM-Friendly:** Highly predictable boilerplate that allows AI code assistants to write drivers effortlessly.
 * **OPI Integration:** Automated operator interface generation for Phoebus.
 
@@ -35,7 +35,15 @@ To see the framework in action without physical hardware, you can launch a simul
 ```bash
 python -m epicsdev.multiadc -C 100 -n 1000
 ```
-To change the data publishing frequency, modify the `sleep` PV: `pvput multiadc:0:sleep .1`.
+To change the data publication frequency, modify the `sleep` PV: `pvput multiadc:0:sleep .1`.
+
+#### Quick GUI
+To control and plot the server's PVs, you can use the `pypeto` and `pvplot` modules.
+
+```bash
+pip install pypeto pvplot
+python -m pypeto -f config/multiadc_pp
+```
 
 Other examples include a single-waveform generator and a multi-peak image generator:
 ```bash
@@ -45,7 +53,7 @@ python -m epicsdev.imagegen
 See [imagegen usage](docs/imagegenUsage.md) for more details.
 
 ### 4. Continuous Integration
-To package epicsdev-based PVAccess servers as standalone Linux executables in your build pipeline, see the [Continuous Integration Guide](docs/epicsdev_continuous_integration.md) for PyInstaller build instructions and dependency requirements.
+To package `epicsdev`-based PVAccess servers as standalone Linux executables in your build pipeline, see the [Continuous Integration Guide](docs/epicsdev_continuous_integration.md) for PyInstaller build instructions and dependency requirements.
 
 ## Fully Functional PVAccess Servers Developed Using epicsdev
 
@@ -65,6 +73,7 @@ Signal Generators
 
 Data Acquisition Instruments
 * [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
+* [NI cDAQ](https://github.com/eicorg/epicsdev_cdaq). Under development
 * [LabJack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
 
 Magnetometers

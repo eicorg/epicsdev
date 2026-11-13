@@ -1,7 +1,7 @@
 """Pypet page for epicdev.epicsdev module"""
 # pylint: disable=invalid-name
 # format: pypeto 1.2+
-__version__ = 'v0.0.2 2026-01-28'# corrected the Plot action
+__version__ = 'v3.3.4 2026-11-12'# corrected naming convention for version
 print(f'multiadc {__version__}')
 
 #``````````````````Definitions````````````````````````````````````````````````
