@@ -19,8 +19,7 @@ Copy the [server template](https://github.com/eicorg/epicsdev/blob/main/docs/tem
 
 ### Check if basic functionality is working
 ```bash
-source .venv/bin/activate
-python -m my_server
+uv run python -m my_server
 ```
 Check from another terminal that the server publishes templated PVs:
 ```bash
