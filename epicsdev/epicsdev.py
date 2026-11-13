@@ -2,7 +2,7 @@
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
 # pylint: disable=broad-exception-caught
-__version__= 'v3.3.3 26-10-02'# extra error handling for write_cache and putLog
+__version__= 'v3.3.4 2026-11-12'# epicsdev.epicsdev: default name changed to include colon
 #TODO: publish with ifChanged=True, does not work for arrays
 #TODO: ifChanged does not work for enums
 
@@ -518,7 +518,6 @@ def sleep():
     C_.lastCycleTime = tnow
     C_.cyclesAfterUpdate += 1
     C_.cycle += 1
-    printv(f'cycle {C_.cycle}')
     if tnow - C_.lastUpdateTime > PeriodicUpdateInterval:
         avgCycleTime = C_.cycleTimeSum / C_.cyclesAfterUpdate
         printv(f'Average cycle time: {avgCycleTime:.6f} S.')
@@ -622,7 +621,7 @@ if __name__ == "__main__":
 'If a file name is given, then it is used for autosave.')
     parser.add_argument('-c', '--recall', action='store_false', help=
 'If given: Do not load initial values from pvCache file. That is useful when you want to start with default values, but do not want to disable autosave. By default, the initial values are loaded from the cache file if it exists.')
-    parser.add_argument('-d', '--device', default='epicsDev', help=
+    parser.add_argument('-d', '--device', default='epicsDev:', help=
 'Device name, the PV name will be <device><index>:')
     parser.add_argument('-i', '--index', default='0', help=
 'Device index, the PV name will be <device><index>:') 
