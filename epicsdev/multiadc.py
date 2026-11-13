@@ -1,9 +1,9 @@
 """Simulated multi-channel ADC device server using epicsdev module."""
 # pylint: disable=invalid-name
-__version__= 'v0.1.1 09-11-2026'# Print elapsed times
+__version__= 'v3.3.4 2026-11-12'# print elapsed times when verbose level is set
 
 from dataclasses import dataclass
-from time import perf_counter as timer
+import time
 import argparse
 import numpy as np
 
@@ -44,13 +44,10 @@ def myPVDefs():
             pvDefs.append(newpvdef)
     return pvDefs
 
+timer = time.perf_counter
 nPatterns = 100 # number of waveform patterns.
-pargs = None
 rng = np.random.default_rng(nPatterns)
-nPoints = 100
-verbose = 0
 ElapsedTime = {'publish': 0.,'update': 0.}
-
 
 @dataclass(slots=True)
 class C_():
@@ -98,7 +95,7 @@ def poll():
     #pattern = C_.cycle % nPatterns# produces sliding
     C_.cyclesSinceUpdate += 1
     cycle = edev.pvv('cycle')
-    edev.printv(f'cycle {repr(cycle)}')
+    edev.printvv(f'cycle {repr(cycle)}')
     edev.publish('cycle', cycle + 1)
     for ch in range(pargs.channels):
         pattern = rng.integers(0, nPatterns)
@@ -121,7 +118,7 @@ def poll():
 def periodic_update():
     """Function called periodically in the main server loop."""
     wf = edev.pvv('c01Waveform')
-    edev.printi(f'Elapsed milliseconds during last {C_.cyclesSinceUpdate} cycles:'
+    edev.printv(f'{time.strftime("%m%d:%H%M%S")} Elapsed milliseconds during last {C_.cyclesSinceUpdate} cycles:'
         f'{[(name, round(v*1000,4)) for name, v in ElapsedTime.items()]}'
         f',  total size of all waveforms is {pargs.channels * pargs.npoints * wf.itemsize / 1024} KB')
     C_.cyclesSinceUpdate = 0
@@ -138,23 +135,25 @@ parser.add_argument('-c', '--recall', action='store_false', help=
 'If given: do not restore initial PV values from autosave cache.')
 parser.add_argument('-C', '--channels', type=int, default=6, help=
 'Number of channels per device, each channel hosts a waveform, its mean and peak2peak amplitude')
-parser.add_argument('-e', '--external', help=
-'Name of external PV, which controls the server, if 0 then it will be <device>0:')
+# parser.add_argument('-e', '--external', help=
+# 'Name of external PV, which controls the server, if 0 then it will be <device>0:')
 parser.add_argument('-l', '--list', default=None, nargs='?', help=
 'Directory to save list of all generated PVs, if None, then </tmp/pvlist/><prefix> is assumed.')
 parser.add_argument('-i', '--instance', default='0', help=
 'Device index, the PV name will be <device><index>:') 
-# The rest of arguments are not essential, they can be changed at runtime using PVs.
-parser.add_argument('-n', '--npoints', type=int, default=nPoints, help=
-'Number of points in each waveform')
-parser.add_argument('-p', '--putlogPV', nargs='?', default='', help=
-'PV name for logging put operations. Empty means default putlog:dump.')
-parser.add_argument('-v', '--verbose', action='count', default=verbose, help=
+parser.add_argument('-v', '--verbose', action='count', default=0, help=
 'Show more log messages (-vv: show even more)') 
 parser.add_argument('device', nargs='?', default='multiadc:', help=
 'Device name, the prefix for all generated PVs <prefix><instance>:')
+
+# These arguments are optional and can be modified at runtime using PVs.
+parser.add_argument('-n', '--npoints', type=int, default=100, help=
+'Number of points in each waveform')
+parser.add_argument('-p', '--putlogPV', nargs='?', default='', help=
+'PV name for logging put operations. Empty means default putlog:dump.')
+
 pargs = parser.parse_args()
-print(f'pargs: {pargs}')
+edev.printvv(f'pargs: {pargs}')
 
 # Initialize epicsdev and PVs
 pargs.prefix = f'{pargs.device}{pargs.instance}:'
