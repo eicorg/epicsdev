@@ -1,5 +1,8 @@
-"""Pypet page for epicdev.epicsdev module"""
-# format: pypeto 1.2+
+"""Pypet page for epicdev.epicsdev module."""
+# pylint: disable=invalid-name
+# pylint: disable=missing-function-docstring
+# pylint: disable=multiple-statements
+
 __version__ = 'v3.3.4 2026-11-12'# updated to match multiadc and epicsdev versions
 print(f'epicsScope {__version__}')
 
