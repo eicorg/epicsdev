@@ -2,7 +2,7 @@
 # pylint: disable=invalid-name
 # pylint: disable=line-too-long
 # pylint: disable=broad-exception-caught
-__version__= 'v3.3.4 2026-11-12'# epicsdev.epicsdev: default name changed to include colon
+__version__= 'v3.3.5 2026-11-15'# replace colons in prefix with double underscores for file name, to avoid problems with colons in file names
 #TODO: publish with ifChanged=True, does not work for arrays
 #TODO: ifChanged does not work for enums
 
@@ -444,7 +444,7 @@ def init_epicsdev(prefix:str, pvDefs:list, verbose=0, serverStateChanged=None,
     if recall and autosaveDir is not None:
         try:
             autosaveFile = os.path.join(autosaveDir, f'{prefix[:-1]}.cache')
-            with open(autosaveFile, "r") as json_file:
+            with open(autosaveFile, "r", encoding="utf-8") as json_file:
                 pvcache = json.load(json_file)
         except Exception:
             print(f'WARNING: pvCache file {autosaveFile} not found. Using default values')
@@ -463,7 +463,7 @@ def init_epicsdev(prefix:str, pvDefs:list, verbose=0, serverStateChanged=None,
             printe(f'Permission denied to create {autosaveDir}. You can define the root directory in OPERATIONS environment variable or disable autosaving.')
             sys.exit(1)
         autosaveFile = os.path.join(autosaveDir, f'{prefix[:-1]}.cache')
-        C_.cachefd = open(autosaveFile, 'w')
+        C_.cachefd = open(autosaveFile, 'w', encoding="utf-8")
         printi(f'Autosave enabled. Saving to {autosaveFile}')
     else:
         printi('Autosave disabled')
@@ -485,7 +485,8 @@ def init_epicsdev(prefix:str, pvDefs:list, verbose=0, serverStateChanged=None,
         listDir = '/tmp/pvlist/' if listDir is None else listDir
         if not os.path.exists(listDir):
             os.makedirs(listDir)
-        filepath = f'{listDir}{prefix[:-1]}.txt'
+        safe_prefix = prefix[:-1].replace(':', '__')
+        filepath = f'{listDir}{safe_prefix}.txt'
         printi(f'Writing list of PVs to {filepath}')
         with open(filepath, 'w', encoding="utf-8") as f:
             for _pvname in pvs:
