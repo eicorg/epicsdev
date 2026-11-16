@@ -2,7 +2,7 @@
 # pylint: disable=invalid-name
 # format: pypeto 1.2+
 
-__version__ = 'v0.0.1 2026-11-15'# Version changed
+__version__ = 'v0.0.2 2026-11-15'# Corrected pvplot command for one-row plot and statistics
 print(f'imagegen {__version__}')
 
 _ = ''
@@ -59,7 +59,7 @@ class PyPage():
         D = instance
 
         ViewImage = {'Image view': {'launch': f'{PyPath} imagin -b pva -t 100 {D}image', **lColor, **ButtonFont}}
-        RowPlot = {'Row plot': {'launch': f'{PyPath} pvplot -aV:{D} row0 mean0 std0 peak2peak0', **lColor, **ButtonFont}}
+        RowPlot = {'Row plot': {'launch': f"{PyPath} pvplot -aV:{D} -#0'oneRow' -#1'oneRowMean oneRowStd oneRowPeak2Peak'", **lColor, **ButtonFont}}
         print(f'pvplot command: {RowPlot}')
 
         self.rows = [
