@@ -38,7 +38,7 @@ python -m epicsdev.multiadc -C 100 -n 1000
 To change the data publication frequency, modify the `sleep` PV: `pvput multiadc:0:sleep .1`.
 
 #### Quick GUI
-To control and plot the server's PVs, you can use the `pypeto` and `pvplot` modules.
+To control and plot the server's PVs, you can use the lightweight GUI tools `pypeto` and `pvplot`.
 
 ```bash
 pip install pypeto pvplot
@@ -46,10 +46,18 @@ python -m pypeto -f config/multiadc_pp
 ```
 
 Other examples include a single-waveform generator and a multi-peak image generator:
+
 ```bash
 python -m epicsdev.epicsdev
-python -m epicsdev.imagegen
+python -m epicsdev.imagegen -r 30
 ```
+
+To control, monitor, and view plots and images:
+
+```bash
+python -m pypeto -f config/imagegen_pp
+```
+
 See [imagegen usage](docs/imagegenUsage.md) for more details.
 
 ### 4. Continuous Integration
@@ -73,7 +81,7 @@ Signal Generators
 
 Data Acquisition Instruments
 * [CAEN DT5202](https://github.com/eicorg/epicsdev_daq_caen_dt5202)
-* [NI cDAQ](https://github.com/eicorg/epicsdev_cdaq). Under development
+* [NI cDAQ](https://github.com/eicorg/epicsdev_cdaq)
 * [LabJack U3](https://github.com/eicorg/epicsdev_daq_labjack_u3)
 
 Magnetometers

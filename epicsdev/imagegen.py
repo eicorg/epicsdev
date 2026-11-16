@@ -10,6 +10,7 @@ PVs representing image rows and statistics PVs are updated periodically.
 __version__= 'v0.1.3 26-10-2023'# pylinting, option added: --rotation
 import argparse
 from dataclasses import dataclass
+from time import perf_counter as timer
 import numpy as np
 from scipy import ndimage
 
@@ -36,6 +37,7 @@ def blurred(noise_level, image):
     """Return blurred image with additive noise."""
     if noise_level > 0:
         imageOut = image + RNG.normal(0.0, noise_level, size=image.shape)
+        imageOut += noise_level*4. # add a constant offset to avoid negative values, which are not allowed in int16
     else:
         imageOut = image
     return imageOut.astype(np.int16)
@@ -216,7 +218,7 @@ parser.add_argument("-p", "--putlogPV", default="putlog:dump")
 parser.add_argument("-r", "--rotate", type=float, default=0.0, help=
     "Rotate the image by this angle (degrees) before publishing")
 parser.add_argument("-v", "--verbose", action="count", default=0)
-parser.add_argument('device', nargs='?', default='image', help=
+parser.add_argument('device', nargs='?', default='image:', help=
     'Device name, the prefix for all generated PVs <prefix><instance>:')
 pargs = parser.parse_args()
 pargs.nrows, pargs.ncols = [int(s) for s in pargs.shape.split(',')]
