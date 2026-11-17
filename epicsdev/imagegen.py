@@ -7,7 +7,7 @@ the underlying blob pattern.
 PVs representing image rows and statistics PVs are updated periodically.
 """
 # pylint: disable=invalid-name
-__version__= 'v0.1.3 26-10-2023'# pylinting, option added: --rotation
+__version__= 'v3.3.6 11-15-2023'# fixed missing timer()
 import argparse
 from dataclasses import dataclass
 from time import perf_counter as timer
